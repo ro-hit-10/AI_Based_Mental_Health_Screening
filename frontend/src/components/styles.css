@@ -1,0 +1,17 @@
+/* Common styles for components */
+.component-container {
+  padding: 20px;
+  margin: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.component-title {
+  font-size: 24px;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.component-content {
+  margin-top: 15px;
+} 

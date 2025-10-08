@@ -1,0 +1,29 @@
+# ==============================
+#  AI Project .gitignore
+# ==============================
+
+# Large model files
+*.safetensors
+*.pt
+*.bin
+*.joblib
+*.pkl
+
+# Python cache & virtual envs
+__pycache__/
+*.pyc
+.venv/
+.env/
+
+# Node.js dependencies
+node_modules/
+
+# Build / dist folders
+build/
+dist/
+
+# IDE / system files
+.vscode/
+.idea/
+*.log
+.DS_Store
