@@ -44,7 +44,7 @@ const Suggestions = () => {
           return;
         }
 
-        const resp = await axios.post('http://localhost:5000/api/screening/suggestions', {
+        const resp = await axios.post('/api/screening/suggestions', {
           depression_level: depressionLevel,
           domain,
           phqAnswers

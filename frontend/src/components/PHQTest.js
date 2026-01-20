@@ -36,7 +36,7 @@ const PHQTest = () => {
       // Submit PHQ-9 test
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.post('http://localhost:5000/api/phq/submit', {
+        const response = await axios.post('/api/phq/submit', {
           answers: Object.values(newAnswers)
         }, {
           headers: {

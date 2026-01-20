@@ -13,7 +13,11 @@
 __pycache__/
 *.pyc
 .venv/
-.env/
+
+# Environment files
+.env
+ai-engine/.env
+backend/.env
 
 # Node.js dependencies
 node_modules/
@@ -27,7 +31,3 @@ dist/
 .idea/
 *.log
 .DS_Store
-
-
-ai-engine/.env
-backend/.env

@@ -19,7 +19,7 @@ const Dashboard = () => {
           return;
         }
 
-        const response = await axios.get('http://localhost:5000/api/users/dashboard', {
+        const response = await axios.get('/api/users/dashboard', {
           headers: {
             Authorization: `Bearer ${token}`
           }

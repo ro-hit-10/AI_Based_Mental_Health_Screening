@@ -3,7 +3,11 @@
   "builds": [
     { "src": "backend/package.json", "use": "@vercel/node" },
     { "src": "ai-engine/app.py", "use": "@vercel/python" },
-    { "src": "frontend/package.json", "use": "@vercel/static-build" }
+    { 
+      "src": "frontend/package.json", 
+      "use": "@vercel/static-build",
+      "config": { "distDir": "build" }
+    }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/backend/server.js" },

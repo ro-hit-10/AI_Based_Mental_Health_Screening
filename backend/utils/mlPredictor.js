@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // AI Engine service URLs
-const AI_ENGINE_BASE = 'http://localhost:5001/api';
+const AI_ENGINE_BASE = process.env.AI_ENGINE_BASE || 'http://localhost:5001/api';
 
 // Predict domain using trained RoBERTa model
 async function predictDomain(phqAnswers, userHistory, occupation, age) {

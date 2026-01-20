@@ -24,7 +24,7 @@ const Screening = () => {
     const fetchQuestions = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.post('http://localhost:5000/api/screening/start', {
+        const response = await axios.post('/api/screening/start', {
           domain: localStorage.getItem('assignedDomain'),
           latestPHQAnswers: JSON.parse(localStorage.getItem('latestPHQAnswers') || '[]')
         }, {
@@ -54,7 +54,7 @@ const Screening = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:5000/api/screening/save', {
+      const response = await axios.post('/api/screening/save', {
         domain: localStorage.getItem('assignedDomain'),
         latestPHQAnswers: JSON.parse(localStorage.getItem('latestPHQAnswers') || '[]'),
         questions: questions,

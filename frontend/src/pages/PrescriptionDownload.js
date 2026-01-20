@@ -19,7 +19,7 @@ const PrescriptionDownload = () => {
           return;
         }
 
-        const response = await fetch('http://localhost:5000/api/reports/patient-data', {
+        const response = await fetch('/api/reports/patient-data', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
