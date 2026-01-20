@@ -81,11 +81,11 @@ class MentalHealthAI:
                 if os.path.exists(suggestion_path) and os.path.exists(os.path.join(suggestion_path, "config.json")):
                     self.suggestion_tokenizer = T5Tokenizer.from_pretrained(suggestion_path)
                     self.suggestion_model = T5ForConditionalGeneration.from_pretrained(suggestion_path)
-                    print("✓ Suggestion model loaded successfully!")
+                    print("Suggestion model loaded successfully.")
                 else:
-                    print("⚠ Suggestion model not found, will use Gemini API as primary")
+                    print("Suggestion model not found, will use Gemini API as primary")
             except Exception as e:
-                print(f"⚠ Could not load suggestion model: {e}")
+                print(f"Could not load suggestion model: {e}")
                 print("Will use Gemini API as primary for suggestions")
             
             print("Models loaded successfully!")

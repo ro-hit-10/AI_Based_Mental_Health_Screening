@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "backend/package.json", "use": "@vercel/node" },
+    { "src": "ai-engine/app.py", "use": "@vercel/python" },
+    { "src": "frontend/package.json", "use": "@vercel/static-build" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/backend/server.js" },
+    { "src": "/ai/(.*)", "dest": "/ai-engine/app.py" },
+    { "src": "/(.*)", "dest": "/frontend/build/$1" }
+  ]
+}
