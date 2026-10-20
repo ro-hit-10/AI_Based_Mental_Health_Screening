@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import './Dashboard.css'; // Use dashboard styling
+import { AlertCircle, ArrowRight, FileText, Stethoscope } from 'lucide-react';
+import ScoreRing from '../ui/ScoreRing';
+import CrisisCard from '../ui/CrisisCard';
+import Loader from '../ui/Loader';
+import { getLevel, LEVEL_ORDER } from '../ui/levels';
+import { Reveal, stagger, fadeUp, ease } from '../ui/motion';
 
 const ScreeningResult = () => {
   const navigate = useNavigate();
   const [analysisData, setAnalysisData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -15,224 +19,123 @@ const ScreeningResult = () => {
       navigate('/ai-screening');
       return;
     }
-    
     try {
       const parsed = JSON.parse(raw);
-      console.log('Screening analysis data:', parsed);
-      
       if (parsed.error) {
         setError(`API Error: ${parsed.error}`);
-        setLoading(false);
         return;
       }
-      
       setAnalysisData({
         depression_level: parsed?.depression_level || 'No Depression',
         confidence: parsed?.confidence || 0,
         key_indicators: parsed?.key_indicators || [],
-        suggestions: parsed?.suggestions || [],
-        domain: parsed?.domain || '',
+        domain: parsed?.domain || localStorage.getItem('assignedDomain') || '',
         phq9_score: parsed?.phq9_score || 0
       });
-      setLoading(false);
     } catch (e) {
       console.error('Error parsing screening analysis:', e);
       setError('Error loading analysis data');
-      setLoading(false);
     }
   }, [navigate]);
 
-  const getLevelColor = (level) => {
-    switch(level?.toLowerCase()) {
-      case 'no depression':
-      case 'minimal':
-        return '#4ECDC4';
-      case 'mild':
-        return '#FFD93D';
-      case 'moderate':
-        return '#FF9F43';
-      case 'moderately severe':
-      case 'severe':
-        return '#FF6B6B';
-      default:
-        return '#6C5CE7';
-    }
-  };
-
-  const getLevelIcon = (level) => {
-    switch(level?.toLowerCase()) {
-      case 'no depression':
-      case 'minimal':
-        return '😊';
-      case 'mild':
-        return '😐';
-      case 'moderate':
-        return '😟';
-      case 'moderately severe':
-      case 'severe':
-        return '😰';
-      default:
-        return '🤔';
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="dashboard-container">
-        <div className="loading-spinner">Analyzing your responses...</div>
-      </div>
-    );
-  }
-
   if (error) {
     return (
-      <div className="dashboard-container">
-        <div className="error-message">
-          <h2>Analysis Error</h2>
-          <p>{error}</p>
-          <motion.button
-            className="feature-button"
-            onClick={() => navigate('/ai-screening')}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Try Again
-          </motion.button>
-        </div>
+      <div className="page page-narrow">
+        <div className="alert alert-error"><AlertCircle size={18} /> {error}</div>
+        <button className="btn btn-primary" style={{ marginTop: '1.25rem' }} onClick={() => navigate('/ai-screening')}>Try again</button>
       </div>
     );
   }
 
-  if (!analysisData) return null;
+  if (!analysisData) return <Loader message="Loading your results…" />;
+
+  const level = getLevel(analysisData.depression_level);
+  const levelIndex = LEVEL_ORDER.findIndex((s) => getLevel(s) === level);
+  const phqAnswers = JSON.parse(localStorage.getItem('latestPHQAnswers') || '[]');
+  const showCrisis = levelIndex === 3 || (phqAnswers[8] || 0) >= 1;
 
   return (
-    <motion.div
-      className="dashboard-container"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
-      <motion.div 
-        className="dashboard-header"
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        <h1>AI Screening Results</h1>
-        <p>Based on your responses, here's our comprehensive analysis</p>
-      </motion.div>
-
-      <motion.div 
-        className="dashboard-stats"
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-      >
-        {/* Depression Level Card */}
-        <motion.div
-          className="stat-card"
-          style={{ borderColor: getLevelColor(analysisData.depression_level) }}
-          whileHover={{ scale: 1.05 }}
-        >
-          <div className="feature-icon" style={{ fontSize: '4rem' }}>
-            {getLevelIcon(analysisData.depression_level)}
-          </div>
-          <h3 style={{ color: getLevelColor(analysisData.depression_level) }}>
-            {analysisData.depression_level}
-          </h3>
-          <p className="stat-value">Depression Level</p>
-          <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>
-            Confidence: {Math.round(analysisData.confidence * 100)}%
-          </p>
-        </motion.div>
-
-        {/* PHQ-9 Score Card */}
-        <motion.div
-          className="stat-card"
-          whileHover={{ scale: 1.05 }}
-        >
-          <div className="feature-icon">📊</div>
-          <h3>PHQ-9 Score</h3>
-          <p className="stat-value" style={{ fontSize: '2rem', fontWeight: 'bold' }}>
-            {analysisData.phq9_score}/27
-          </p>
-        </motion.div>
-
-        {/* Domain Card */}
-        <motion.div
-          className="stat-card"
-          whileHover={{ scale: 1.05 }}
-        >
-          <div className="feature-icon">🎯</div>
-          <h3>Primary Domain</h3>
-          <p className="stat-value">{analysisData.domain || 'General'}</p>
-        </motion.div>
-      </motion.div>
-
-      {/* Key Indicators */}
-      {analysisData.key_indicators && analysisData.key_indicators.length > 0 && (
-        <motion.div 
-          className="features-grid"
-          style={{ gridTemplateColumns: '1fr' }}
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <motion.div
-            className="feature-card"
-            whileHover={{ scale: 1.02 }}
+    <div className="page">
+      <motion.section className="card level-hero" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease }}>
+        <div className="level-hero-main">
+          <span className="eyebrow">Your AI screening result</span>
+          <motion.h1
+            className="level-name"
+            style={{ color: level.color }}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2, ease }}
           >
-            <div className="feature-icon">🔍</div>
-            <h3>Key Indicators</h3>
-            <ul style={{ textAlign: 'left', color: '#e0e0e0', lineHeight: '1.8' }}>
-              {analysisData.key_indicators.map((indicator, index) => (
-                <li key={index} style={{ marginBottom: '0.5rem' }}>{indicator}</li>
-              ))}
-            </ul>
-          </motion.div>
-        </motion.div>
+            {level.title}
+          </motion.h1>
+          <p className="level-message">{level.message}</p>
+
+          <div className="level-scale" aria-label={`Level ${levelIndex + 1} of 4`}>
+            {LEVEL_ORDER.map((s, i) => {
+              const l = getLevel(s);
+              return (
+                <div key={s} className="level-seg">
+                  <div className="level-bar">
+                    <motion.span
+                      style={{ background: l.hex }}
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: i <= levelIndex ? 1 : 0 }}
+                      transition={{ delay: 0.6 + i * 0.15, duration: 0.45, ease }}
+                    />
+                  </div>
+                  <span className={i === levelIndex ? 'current' : ''}>{l.title}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="level-hero-side">
+          <div>
+            <ScoreRing value={Math.round(analysisData.confidence * 100)} max={100} size={132} suffix="%" label="confidence" />
+          </div>
+          <div>
+            <ScoreRing value={analysisData.phq9_score} max={27} size={132} color={level.hex} label="PHQ-9 / 27" />
+          </div>
+          <div className="level-domain">
+            <span className="stat-label">Focus area</span>
+            <span className="domain-name">{analysisData.domain || 'General'}</span>
+          </div>
+        </div>
+      </motion.section>
+
+      {showCrisis && (
+        <div style={{ marginTop: '1.25rem' }}>
+          <CrisisCard />
+        </div>
       )}
 
-      {/* Action Buttons */}
-      <motion.div 
-        className="dashboard-stats"
-        style={{ marginTop: '2rem' }}
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.6 }}
-      >
-        <motion.button
-          className="feature-button"
-          style={{ width: '100%', padding: '1.2rem 2rem' }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => navigate('/suggestions')}
-        >
-          View Personalized Suggestions 💡
-        </motion.button>
-        
-        <motion.button
-          className="feature-button"
-          style={{ 
-            width: '100%', 
-            padding: '1.2rem 2rem',
-            background: 'rgba(255, 255, 255, 0.1)',
-            marginTop: '1rem'
-          }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => navigate('/dashboard')}
-        >
-          Return to Dashboard 🏠
-        </motion.button>
-      </motion.div>
-    </motion.div>
+      {analysisData.key_indicators.length > 0 && (
+        <Reveal className="card card-pad section">
+          <h2 className="section-title">What we noticed in your answers</h2>
+          <motion.ol className="indicator-list" variants={stagger(0.12)} initial="hidden" whileInView="show" viewport={{ once: true }}>
+            {analysisData.key_indicators.map((indicator, index) => (
+              <motion.li key={index} variants={fadeUp}>
+                <span className="indicator-num">{String(index + 1).padStart(2, '0')}</span>
+                <span>{indicator}</span>
+              </motion.li>
+            ))}
+          </motion.ol>
+        </Reveal>
+      )}
+
+      <Reveal className="btn-row section">
+        <button className="btn btn-primary" onClick={() => navigate('/suggestions')}>
+          See your care plan <ArrowRight size={17} className="arrow" />
+        </button>
+        <button className="btn btn-ghost" onClick={() => navigate('/prescription-download')}><FileText size={17} /> Full report</button>
+        <button className="btn btn-ghost" onClick={() => navigate('/professionals')}><Stethoscope size={17} /> Talk to an expert</button>
+      </Reveal>
+
+      <p className="faint small" style={{ marginTop: '2rem' }}>
+        This is an AI-assisted screening, not a medical diagnosis.
+      </p>
+    </div>
   );
 };
 
 export default ScreeningResult;
-
-
-
-
-

@@ -1,7 +1,10 @@
-const axios = require('axios');
+const axiosLib = require('axios');
 
-// AI Engine service URLs
-const AI_ENGINE_BASE = 'http://localhost:5001/api';
+// AI Engine service URL - set AI_ENGINE_URL in production (e.g. the Hugging Face Space URL)
+const AI_ENGINE_BASE = `${(process.env.AI_ENGINE_URL || 'http://localhost:5001').replace(/\/$/, '')}/api`;
+
+// A sleeping Hugging Face Space can take a minute to wake up, so allow generous timeouts
+const axios = axiosLib.create({ timeout: 180000 });
 
 // Predict domain using trained RoBERTa model
 async function predictDomain(phqAnswers, userHistory, occupation, age) {
@@ -21,14 +24,16 @@ async function predictDomain(phqAnswers, userHistory, occupation, age) {
 }
 
 // Generate personalized questions using trained T5 model
-async function generateQuestions(phqAnswers, domain, history, previousAnswers = null, isFollowup = false) {
+async function generateQuestions(phqAnswers, domain, history, previousAnswers = null, isFollowup = false, occupation = '', age = 25) {
   try {
     const response = await axios.post(`${AI_ENGINE_BASE}/generate-questions`, {
       phq9_answers: phqAnswers,
       domain: domain,
       history: history || '',
       previous_answers: previousAnswers,
-      is_followup: isFollowup
+      is_followup: isFollowup,
+      occupation: occupation || '',
+      age: age || 25
     });
 
     return response.data.questions;
@@ -73,13 +78,14 @@ async function generateSuggestions(depressionLevel, domain, history, phqAnswers)
 }
 
 // Complete screening analysis (depression level + suggestions)
-async function completeScreening(phqAnswers, domain, history, followUpAnswers) {
+async function completeScreening(phqAnswers, domain, history, followUpAnswers, followUpQuestions = []) {
   try {
     const response = await axios.post(`${AI_ENGINE_BASE}/complete-screening`, {
       phq9_answers: phqAnswers,
       domain: domain,
       history: history || '',
-      follow_up_answers: followUpAnswers
+      follow_up_answers: followUpAnswers,
+      follow_up_questions: followUpQuestions
     });
 
     return response.data;

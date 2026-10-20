@@ -1,0 +1,22 @@
+# Render Blueprint for the MindCare AI backend.
+# In Render: New + > Blueprint > pick this repo. You'll be asked for the secret values below.
+services:
+  - type: web
+    name: mindcare-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AI_ENGINE_URL
+        sync: false # e.g. https://<hf-username>-mindcare-ai-engine.hf.space
+      - key: CORS_ORIGINS
+        sync: false # e.g. https://mindcare-ai.vercel.app,*.vercel.app

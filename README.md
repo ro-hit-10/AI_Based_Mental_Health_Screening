@@ -1,250 +1,266 @@
-# Mental Health Depression Detection & Treatment System
+<p align="center">
+  <img src="docs/banner.svg" alt="MindCare AI - AI-assisted mental health screening" width="100%" />
+</p>
 
-A comprehensive AI-powered platform for depression detection and personalized treatment recommendations using trained machine learning models.
+<p align="center">
+  <img alt="React" src="https://img.shields.io/badge/React-18-1f5e4a?style=flat-square&logo=react&logoColor=white" />
+  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-Express-1f5e4a?style=flat-square&logo=nodedotjs&logoColor=white" />
+  <img alt="Python" src="https://img.shields.io/badge/Python-Flask-1f5e4a?style=flat-square&logo=python&logoColor=white" />
+  <img alt="MongoDB" src="https://img.shields.io/badge/MongoDB-Atlas-1f5e4a?style=flat-square&logo=mongodb&logoColor=white" />
+  <img alt="Transformers" src="https://img.shields.io/badge/HF-RoBERTa%20%2B%20T5-1f5e4a?style=flat-square&logo=huggingface&logoColor=white" />
+  <img alt="Gemini" src="https://img.shields.io/badge/Gemini-3.1%20Flash--Lite-1f5e4a?style=flat-square&logo=googlegemini&logoColor=white" />
+</p>
 
-## 🏗️ System Architecture
+**MindCare AI** is an AI-assisted depression screening platform. A user takes the clinically validated
+**PHQ-9** questionnaire, a fine-tuned **RoBERTa** model identifies the area of life affecting them most,
+a fine-tuned **T5** model holds a short personal follow-up conversation, and the user's own answers are
+assessed to produce a depression level, a personalised care plan and a downloadable report.
 
-### Backend (Node.js + Express + MongoDB)
-- **Authentication & User Management**
-- **PHQ-9 Test Management**
-- **AI Screening Sessions**
-- **Data Persistence**
-
-### AI Engine (Python + Flask)
-- **Domain Assignment**: Fine-tuned RoBERTa model
-- **Question Generation**: Fine-tuned T5 model  
-- **Depression Analysis**: Gemini API integration
-- **Suggestion Generation**: Gemini API integration
-
-### Frontend (React/Next.js)
-- **User Dashboard**
-- **PHQ-9 Test Interface**
-- **AI Screening Interface**
-- **Results & Recommendations**
-
-## 🔄 System Flow
-
-### 1. User Registration & Login
-- Users register with personal details (age, occupation, mental health history)
-- JWT-based authentication system
-- User data stored in MongoDB
-
-### 2. PHQ-9 Assessment
-```
-POST /api/phq/submit
-```
-- 9-question PHQ-9 assessment (0-3 scale)
-- **AI Domain Assignment** using trained RoBERTa model
-- Parameters: PHQ-9 responses + user history + occupation + age
-- Domains: Academic Pressure, Relationship Issues, Work Burnout, Loneliness, Self-worth/Identity, Trauma/Abuse, General Depression
-
-### 3. AI Screening Process
-
-#### 3.1 Question Generation
-```
-POST /api/screening/start
-```
-- **Personalized Questions** generated using trained T5 model
-- Input: PHQ-9 results + assigned domain + user history
-- Output: 3-4 personalized therapeutic questions
-- Each user gets different questions even with same domain
-
-#### 3.2 Depression Level Prediction
-```
-POST /api/screening/save
-```
-- **Gemini API Analysis** of user's responses
-- Input: PHQ-9 + domain + history + screening answers
-- Output: Depression level (Minimal/Mild/Moderate/Moderately Severe/Severe)
-- Includes confidence score and key indicators
-
-#### 3.3 Personalized Suggestions
-- **Treatment Recommendations** based on:
-  - Depression level
-  - Assigned domain
-  - User history
-  - PHQ-9 responses
-- Generated using Gemini API with domain-specific prompts
-
-### 4. Follow-up System
-- **Adaptive Follow-up Questions** based on:
-  - Previous PHQ-9 responses
-  - User history
-  - Assigned domain
-  - Previous screening answers
-- Tracks progress over time
-
-## 🤖 AI Models Used
-
-### 1. Domain Assignment (Your Trained RoBERTa Model)
-- **Location**: `ai-engine/models/domain_assignment/`
-- **Purpose**: Classify depression into specific domains
-- **Input**: PHQ-9 responses + user context
-- **Output**: One of 7 depression domains
-
-### 2. Question Generation (Your Trained T5 Model)
-- **Location**: `ai-engine/models/question_generation/`
-- **Purpose**: Generate personalized therapeutic questions
-- **Input**: PHQ-9 + domain + history + previous answers
-- **Output**: 3-4 unique questions per user
-
-### 3. Depression Analysis (Gemini API - ONLY used here)
-- **Purpose**: Analyze user responses to predict depression level
-- **Input**: Complete user profile + screening responses
-- **Output**: Depression level + confidence + key indicators
-
-### 4. Suggestion Generation (Gemini API)
-- **Purpose**: Generate personalized treatment suggestions
-- **Input**: Depression level + domain + user profile
-- **Output**: Evidence-based treatment recommendations
-
-## 🚀 Setup Instructions
-
-### 1. Backend Setup
-```bash
-cd backend
-npm install
-```
-
-### 2. AI Engine Setup
-```bash
-cd ai-engine
-python setup.py
-```
-
-### 3. Environment Configuration
-
-**Backend (.env)**:
-```
-PORT=5000
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-```
-
-**AI Engine (.env)**:
-```
-GEMINI_API_KEY=your_gemini_api_key_here
-FLASK_ENV=development
-```
-
-### 4. Start Services
-
-**Terminal 1 - Backend**:
-```bash
-cd backend
-npm run dev
-# Runs on http://localhost:5000
-```
-
-**Terminal 2 - AI Engine**:
-```bash
-cd ai-engine
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-python app.py
-# Runs on http://localhost:5001
-```
-
-## 📊 API Endpoints
-
-### PHQ-9 Management
-```
-POST /api/phq/submit           - Submit PHQ-9 test
-GET  /api/phq/history          - Get PHQ-9 test history
-GET  /api/phq/latest           - Get latest PHQ-9 test
-GET  /api/phq/details/:testId  - Get specific test details
-```
-
-### AI Screening
-```
-POST /api/screening/start         - Start screening (get questions)
-POST /api/screening/save          - Save screening results
-GET  /api/screening/history       - Get screening history
-GET  /api/screening/details/:id   - Get screening details
-```
-
-### AI Engine Endpoints
-```
-POST /api/phq9-submit        - Submit PHQ-9 for domain assignment
-POST /api/generate-questions - Generate personalized questions
-POST /api/analyze-depression - Analyze depression level
-POST /api/generate-suggestions - Generate treatment suggestions
-POST /api/complete-screening - Complete analysis (all-in-one)
-GET  /api/health            - Health check
-```
-
-## 🎯 Key Features
-
-### ✅ Uses YOUR Trained Models
-- **Domain Assignment**: Your fine-tuned RoBERTa model
-- **Question Generation**: Your fine-tuned T5 model
-- **NO OpenAI/DeepSeek**: Only Gemini for depression analysis
-
-### ✅ Personalized Experience
-- Different questions for each user
-- Domain-specific recommendations
-- History-aware follow-ups
-
-### ✅ Clinical Accuracy
-- PHQ-9 standard assessment
-- Evidence-based suggestions
-- Professional-grade analysis
-
-### ✅ Complete Integration
-- MongoDB data persistence
-- JWT authentication
-- REST API architecture
-- Error handling & fallbacks
-
-## 📋 Data Flow Example
-
-1. **User completes PHQ-9**: [2,1,3,2,1,2,3,1,2] (Score: 17)
-2. **Domain assigned**: "Work Burnout" (using your RoBERTa model)
-3. **Questions generated**: 
-   - "How long have you been feeling burned out at work?"
-   - "What aspects of your work are most draining?"
-   - "How do you manage work-related stress?"
-4. **User answers**: Detailed responses about work stress
-5. **Depression analysis**: "Moderately Severe" (using Gemini)
-6. **Suggestions generated**:
-   - "Establish clear work-life boundaries"
-   - "Practice stress management techniques"
-   - "Consider discussing workload with supervisors"
-
-## 🔧 Troubleshooting
-
-### Model Loading Issues
-- Ensure models are in correct directories
-- Check file permissions
-- Verify PyTorch/Transformers versions
-
-### API Connection Issues
-- Check both servers are running
-- Verify port configurations
-- Check environment variables
-
-### Memory Issues
-- Models are large (500MB+ each)
-- Ensure sufficient RAM available
-- Consider GPU acceleration if available
-
-## 🔮 Future Enhancements
-
-1. **Real-time Chat Interface**
-2. **Progress Tracking Dashboard**
-3. **Multi-language Support**
-4. **Mobile App Integration**
-5. **Healthcare Provider Portal**
+> [!IMPORTANT]
+> MindCare AI is a **screening tool, not a medical diagnosis**. If you or someone you know is in crisis in
+> India, call the **Tele-MANAS** helpline **14416** (24/7, free) or emergency services on **112**.
 
 ---
 
-## 🎉 You're All Set!
+## How it works
 
-Your depression detection system now uses:
-- ✅ Your trained RoBERTa model for domain assignment
-- ✅ Your trained T5 model for question generation  
-- ✅ Gemini API only for depression level prediction
-- ✅ Complete integration with your existing backend
-- ✅ MongoDB persistence for all data
-- ✅ Professional-grade error handling
+<p align="center">
+  <img src="docs/pipeline.svg" alt="Screening pipeline" width="100%" />
+</p>
 
-The system provides personalized, domain-specific depression screening with evidence-based treatment recommendations!
+| Step | What happens | Powered by |
+|---|---|---|
+| **1. PHQ-9** | 9 clinically validated questions about the last two weeks (score 0–27) | Standard PHQ-9 |
+| **2. Focus area** | Classifies the user into one of 6 domains: Academic, Work, Family, Relationship, Social, Trauma | Fine-tuned **RoBERTa** |
+| **3. Conversation** | Generates personal follow-up questions; the user answers in their own words in a chat | Fine-tuned **T5** (+ one curated domain question) |
+| **4. Assessment** | Reads the question–answer pairs and returns *No depression / Mild / Moderate / Severe* with confidence and key indicators | Trained model slot → **Gemini** → PHQ-9 cut-offs (fallback chain) |
+| **5. Care plan** | Personalised suggestions, PDF report, progress tracking, yoga videos and expert directory | Fine-tuned **T5** |
+
+Thoughts of self-harm (PHQ-9 item 9) or a *Severe* result always surface a crisis-support card.
+
+## Screenshots
+
+| Home | Dashboard |
+|---|---|
+| ![Home](docs/screenshots/home.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+| **PHQ-9 check-in** | **AI screening conversation** |
+| ![PHQ-9](docs/screenshots/phq9.png) | ![AI screening](docs/screenshots/ai-screening.png) |
+| **Screening result** | **Care plan** |
+| ![Result](docs/screenshots/result.png) | ![Care plan](docs/screenshots/care-plan.png) |
+
+The UI is a light, high-contrast design system (Instrument Serif + Inter, a single deep-green accent,
+Lucide icons) with restrained motion built on Framer Motion: page transitions, scroll reveals, count-up
+numbers, animated score gauges, a typing indicator in the chat and a guided breathing exercise. It respects
+the operating system's *reduce motion* setting and works down to phone width.
+
+## System architecture
+
+<p align="center">
+  <img src="docs/system-architecture.png" alt="System architecture" width="100%" />
+</p>
+
+```
+React (localhost:3000) ──► Express API (localhost:5000) ──► Flask AI engine (localhost:5001)
+                                   │                                │
+                                   ▼                                ├─ RoBERTa domain classifier
+                             MongoDB Atlas                          ├─ T5 question generator
+                                                                    ├─ T5 suggestion generator
+                                                                    └─ Gemini (depression level)
+```
+
+## Model training
+
+<p align="center">
+  <img src="docs/model-training.png" alt="Model fine-tuning workflow" width="100%" />
+</p>
+
+| Model | Base | Task | Input format |
+|---|---|---|---|
+| Domain classifier | `roberta-base` | 6-class sequence classification | `PHQ-9 responses: [...]. Mental health history: ... Occupation: ... Age: ...` |
+| Question generator | `t5-small` | seq2seq | `phq1:2 phq2:1 ... history: ... domain: ... occupation: ... age: ...` → `Q1: ... \|\| Q2: ...` |
+| Suggestion generator | `t5-small` | seq2seq | profile + depression level → suggestions separated by `;` |
+
+The depression-level step uses **Gemini 3.1 Flash-Lite** because the trained depression model produced
+`nan` targets. Dropping a valid model into `ai-engine/models/depression_prediction/` makes it the primary
+method automatically; invalid outputs are rejected and fall through to Gemini, then to PHQ-9 cut-offs.
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, React Router 6, Framer Motion, Recharts, Lucide icons |
+| Backend | Node.js, Express, Mongoose, JWT auth, bcrypt |
+| AI engine | Python, Flask, PyTorch, Hugging Face Transformers, Google Gemini API |
+| Database | MongoDB Atlas |
+
+## Setup
+
+### Prerequisites
+
+- **Node.js 18+** and npm
+- **Python 3.11 or 3.12**
+- A **MongoDB Atlas** cluster (the free M0 tier is enough) with your IP in *Database & Network Access*
+- A **Gemini API key** from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- The fine-tuned **model weights** (not stored in git - see step 2)
+
+### 1. Clone
+
+```bash
+git clone https://github.com/ro-hit-10/AI_Based_Mental_Health_Screening.git
+cd AI_Based_Mental_Health_Screening
+```
+
+### 2. Add the models
+
+Model weights are too large for git. Place them so the folders look like this:
+
+```
+ai-engine/models/
+├── domain_assignment/     config.json, model.safetensors, label_encoder.joblib
+├── question_generation/   config.json, model.safetensors, spiece.model, tokenizer files
+└── suggestion/            config.json, model.safetensors, spiece.model, tokenizer files
+```
+
+If you have access to the private Hugging Face model repo, you can download them in one go:
+
+```bash
+cd ai-engine
+python -c "from huggingface_hub import snapshot_download; snapshot_download('ro-hit-10/mindcare-models', local_dir='models')"
+```
+
+### 3. Configure environment variables
+
+Create **`backend/.env`**:
+
+```env
+PORT=5000
+MONGO_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/<db>
+JWT_SECRET=<any long random string>
+# Optional - defaults to http://localhost:5001
+AI_ENGINE_URL=http://localhost:5001
+```
+
+Create **`ai-engine/.env`**:
+
+```env
+GEMINI_API_KEY=<your Gemini API key>
+# Optional - defaults to gemini-3.1-flash-lite
+GEMINI_MODEL=gemini-3.1-flash-lite
+```
+
+The frontend works without configuration. To point it at another backend, create `frontend/.env` with
+`REACT_APP_API_URL=http://localhost:5000`.
+
+> `.env` files are git-ignored. Never commit API keys.
+
+### 4. Install dependencies
+
+```bash
+# Backend
+cd backend
+npm install
+
+# Frontend
+cd ../frontend
+npm install
+
+# AI engine (CPU build of PyTorch)
+cd ../ai-engine
+python -m venv .venv
+.venv\Scripts\activate          # macOS / Linux: source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 5. Run
+
+Start each service in its own terminal:
+
+```bash
+# Terminal 1 - AI engine  → http://localhost:5001
+cd ai-engine
+.venv\Scripts\activate
+python app.py
+
+# Terminal 2 - Backend    → http://localhost:5000
+cd backend
+npm run dev
+
+# Terminal 3 - Frontend   → http://localhost:3000
+cd frontend
+npm start
+```
+
+Open **http://localhost:3000**. The AI engine takes ~20 seconds to load its models; check it with
+`http://localhost:5001/api/health`, which reports which models loaded and which method each step uses.
+
+## API reference
+
+<details>
+<summary><b>Backend</b> (Express, port 5000) - all routes except auth need <code>Authorization: Bearer &lt;token&gt;</code></summary>
+
+| Method | Route | Purpose |
+|---|---|---|
+| POST | `/api/auth/register` | Create an account |
+| POST | `/api/auth/login` | Sign in, returns a JWT |
+| GET | `/api/users/dashboard` | Dashboard data |
+| POST | `/api/phq/submit` | Submit PHQ-9 answers, returns score and domain |
+| GET | `/api/phq/history` | PHQ-9 history |
+| POST | `/api/screening/start` | Generate follow-up questions |
+| POST | `/api/screening/save` | Analyse answers, save the session |
+| POST | `/api/screening/suggestions` | Regenerate suggestions |
+| GET | `/api/screening/history` | Screening history |
+| GET | `/api/reports/patient-data` | Full report for the latest session |
+
+</details>
+
+<details>
+<summary><b>AI engine</b> (Flask, port 5001)</summary>
+
+| Method | Route | Purpose |
+|---|---|---|
+| POST | `/api/phq9-submit` | Domain classification |
+| POST | `/api/generate-questions` | Follow-up questions |
+| POST | `/api/analyze-depression` | Depression level from question–answer pairs |
+| POST | `/api/generate-suggestions` | Care-plan suggestions |
+| POST | `/api/complete-screening` | Assessment + suggestions in one call |
+| GET | `/api/health` | Model status and active methods |
+
+</details>
+
+## Project structure
+
+```
+├── frontend/            React app
+│   └── src/
+│       ├── pages/       Home, auth, dashboard, results, care plan, report, experts
+│       ├── components/  PHQ-9, AI screening chat, progress, yoga, articles
+│       ├── ui/          Design-system components (navbar, loader, score ring, motion)
+│       └── styles/      theme.css (tokens + components), pages.css
+├── backend/             Express API, Mongoose models, JWT auth
+├── ai-engine/
+│   ├── app.py           Flask API and screening logic
+│   ├── inference.py     PyTorch / ONNX inference backends (for CPU hosting; not used by app.py yet)
+│   ├── tools/           export_onnx.py - compress models for CPU hosting
+│   └── models/          Fine-tuned weights (not in git)
+└── docs/                README images and diagrams
+```
+
+## Deployment notes
+
+Deployment configs are included but **not active**: `render.yaml` (backend), `frontend/vercel.json`
+(frontend) and `ai-engine/Dockerfile` (AI engine). The AI engine needs roughly 1–2 GB of RAM, which is more
+than free tiers such as Render's 512 MB provide. `ai-engine/tools/export_onnx.py` produces compressed ONNX
+models (int8 T5, fp16 RoBERTa); in testing they ran in about 1 GB without PyTorch, which is still above
+512 MB.
+
+## Known limitations
+
+- The domain classifier reaches about 35% accuracy on the project dataset with the current input format;
+  its original training script (and exact input format) would be needed to restore the 80% reported in training.
+- The T5 question generator tends to produce generic questions, so each session opens with one curated
+  domain-specific question.
+- The *Find an expert* directory contains sample listings for demonstration.
+
+---
+
+<p align="center"><sub>Built with care. If you are struggling, please reach out - you don't have to go through it alone.</sub></p>

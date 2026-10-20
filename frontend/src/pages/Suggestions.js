@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import './Dashboard.css'; // Use dashboard styling
+import { AlertCircle, Check, Flower2, Stethoscope, FileText, ArrowRight } from 'lucide-react';
+import api from '../utils/api';
+import Loader from '../ui/Loader';
+import PageHeader from '../ui/PageHeader';
+import { Reveal, stagger, fadeUp } from '../ui/motion';
+import { getLevel } from '../ui/levels';
 
 const Suggestions = () => {
   const navigate = useNavigate();
@@ -10,11 +14,17 @@ const Suggestions = () => {
   const [analysisData, setAnalysisData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [done, setDone] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('suggestionsDone') || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     const fetchSuggestions = async () => {
       try {
-        // First check if we have screening analysis data
         const analysisRaw = localStorage.getItem('screeningAnalysis');
         if (!analysisRaw) {
           navigate('/ai-screening');
@@ -22,43 +32,28 @@ const Suggestions = () => {
         }
 
         const parsedAnalysis = JSON.parse(analysisRaw);
-        console.log('Analysis data for suggestions:', parsedAnalysis);
         setAnalysisData(parsedAnalysis);
 
-        // Check if suggestions are already in the analysis data
-        if (parsedAnalysis.suggestions && Array.isArray(parsedAnalysis.suggestions) && parsedAnalysis.suggestions.length > 0) {
+        if (Array.isArray(parsedAnalysis.suggestions) && parsedAnalysis.suggestions.length > 0) {
           setSuggestions(parsedAnalysis.suggestions);
-          setLoading(false);
           return;
         }
 
-        // If no suggestions in analysis, fetch them from API
-        const token = localStorage.getItem('token');
-        const phqAnswers = JSON.parse(localStorage.getItem('latestPHQAnswers') || '[]');
-        const domain = localStorage.getItem('assignedDomain') || parsedAnalysis.domain || '';
         const depressionLevel = parsedAnalysis?.depression_level || '';
-
         if (!depressionLevel) {
           setError('No depression level found. Please complete the screening first.');
-          setLoading(false);
           return;
         }
 
-        const resp = await axios.post('http://localhost:5000/api/screening/suggestions', {
+        const resp = await api.post('/api/screening/suggestions', {
           depression_level: depressionLevel,
-          domain,
-          phqAnswers
-        }, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          domain: localStorage.getItem('assignedDomain') || parsedAnalysis.domain || '',
+          phqAnswers: JSON.parse(localStorage.getItem('latestPHQAnswers') || '[]')
         });
 
         const fetchedSuggestions = Array.isArray(resp.data?.suggestions) ? resp.data.suggestions : [];
         setSuggestions(fetchedSuggestions);
-        
-        // Update localStorage with suggestions
-        const updatedAnalysis = { ...parsedAnalysis, suggestions: fetchedSuggestions };
-        localStorage.setItem('screeningAnalysis', JSON.stringify(updatedAnalysis));
-        
+        localStorage.setItem('screeningAnalysis', JSON.stringify({ ...parsedAnalysis, suggestions: fetchedSuggestions }));
       } catch (e) {
         console.error('Failed to fetch suggestions', e);
         setError('Failed to load suggestions. Please try again.');
@@ -69,218 +64,112 @@ const Suggestions = () => {
     fetchSuggestions();
   }, [navigate]);
 
-  const getSuggestionIcon = (index) => {
-    const icons = ['💡', '🎯', '🌱', '💪', '🧠', '❤️', '🌟'];
-    return icons[index % icons.length];
+  const toggleDone = (s) => {
+    const next = done.includes(s) ? done.filter((d) => d !== s) : [...done, s];
+    setDone(next);
+    try {
+      localStorage.setItem('suggestionsDone', JSON.stringify(next));
+    } catch {
+      // storage unavailable - progress just won't persist
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="dashboard-container">
-        <div className="loading-spinner">Loading personalized suggestions...</div>
-      </div>
-    );
-  }
+  if (loading) return <Loader messages={['Gathering your recommendations…', 'Personalising your plan…']} />;
 
   if (error) {
     return (
-      <div className="dashboard-container">
-        <div className="error-message">
-          <h2>Error Loading Suggestions</h2>
-          <p>{error}</p>
-          <motion.button
-            className="feature-button"
-            onClick={() => navigate('/ai-screening')}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Go Back to Screening
-          </motion.button>
-        </div>
+      <div className="page page-narrow">
+        <div className="alert alert-error"><AlertCircle size={18} /> {error}</div>
+        <button className="btn btn-primary" style={{ marginTop: '1.25rem' }} onClick={() => navigate('/ai-screening')}>Back to screening</button>
       </div>
     );
   }
 
+  const level = getLevel(analysisData?.depression_level);
+  const completed = suggestions.filter((s) => done.includes(s)).length;
+
   return (
-    <motion.div
-      className="dashboard-container"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
-      <motion.div 
-        className="dashboard-header"
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        <h1>Personalized Suggestions</h1>
-        <p>Based on your screening results, here are evidence-based recommendations tailored for you</p>
-      </motion.div>
+    <div className="page">
+      <PageHeader
+        eyebrow="Your care plan"
+        title="Small steps, real change"
+        italic={[3]}
+        subtitle="Recommendations from your screening. Mark each one as done once you have tried it."
+      />
 
-      {/* Summary Card */}
-      {analysisData && (
-        <motion.div 
-          className="dashboard-stats"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <motion.div
-            className="stat-card"
-            whileHover={{ scale: 1.05 }}
-          >
-            <div className="feature-icon">📋</div>
-            <h3>Your Profile</h3>
-            <p className="stat-value">
-              Level: {analysisData.depression_level}<br/>
-              Domain: {analysisData.domain || 'General'}<br/>
-              PHQ-9: {analysisData.phq9_score}/27
-            </p>
-          </motion.div>
-          
-          <motion.div
-            className="stat-card"
-            whileHover={{ scale: 1.05 }}
-          >
-            <div className="feature-icon">🎯</div>
-            <h3>Suggestions Count</h3>
-            <p className="stat-value" style={{ fontSize: '2rem', fontWeight: 'bold' }}>
-              {suggestions.length}
-            </p>
-            <p style={{ fontSize: '0.9rem' }}>Personalized recommendations</p>
-          </motion.div>
-        </motion.div>
-      )}
-
-      {/* Suggestions Grid */}
-      {suggestions.length > 0 ? (
-        <motion.div 
-          className="features-grid"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          {suggestions.map((suggestion, index) => (
-            <motion.div
-              key={index}
-              className="feature-card"
-              whileHover={{ scale: 1.02 }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 * index }}
-            >
-              <div className="feature-icon" style={{ fontSize: '2.5rem' }}>
-                {getSuggestionIcon(index)}
-              </div>
-              <h3>Suggestion {index + 1}</h3>
-              <p style={{ 
-                textAlign: 'left', 
-                lineHeight: '1.6', 
-                color: '#e0e0e0',
-                fontSize: '1.1rem'
-              }}>
-                {suggestion}
-              </p>
-            </motion.div>
-          ))}
-        </motion.div>
-      ) : (
-        <motion.div 
-          className="features-grid"
-          style={{ gridTemplateColumns: '1fr' }}
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <motion.div
-            className="feature-card"
-            whileHover={{ scale: 1.02 }}
-          >
-            <div className="feature-icon">⚠️</div>
-            <h3>No Suggestions Available</h3>
-            <p>We couldn't generate personalized suggestions at this time. Please try completing the screening again.</p>
-            <motion.button
-              className="feature-button"
-              onClick={() => navigate('/ai-screening')}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Retake Screening
-            </motion.button>
-          </motion.div>
-        </motion.div>
-      )}
-
-      {/* Action Buttons */}
-      <motion.div 
-        className="dashboard-stats"
-        style={{ marginTop: '3rem' }}
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.8 }}
-      >
-        <motion.button
-          className="feature-button"
-          style={{ width: '100%', padding: '1.2rem 2rem' }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => navigate('/dashboard')}
-        >
-          Return to Dashboard 🏠
-        </motion.button>
-        
-        <motion.button
-          className="feature-button"
-          style={{ 
-            width: '100%', 
-            padding: '1.2rem 2rem',
-            background: 'rgba(255, 255, 255, 0.1)',
-            marginTop: '1rem'
-          }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => navigate('/screening-result')}
-        >
-          View Results Again 📊
-        </motion.button>
-      </motion.div>
-
-      {/* Disclaimer */}
-      <motion.div 
-        className="features-grid"
-        style={{ gridTemplateColumns: '1fr', marginTop: '2rem' }}
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 1.0 }}
-      >
-        <div 
-          className="feature-card"
-          style={{ 
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.05)'
-          }}
-        >
-          <div className="feature-icon" style={{ fontSize: '1.5rem' }}>⚠️</div>
-          <h3 style={{ fontSize: '1.2rem' }}>Important Disclaimer</h3>
-          <p style={{ 
-            fontSize: '0.9rem',
-            color: '#b0b0b0',
-            lineHeight: '1.5'
-          }}>
-            These suggestions are AI-generated based on your responses and are not a substitute for professional medical advice. 
-            If you're experiencing severe symptoms or having thoughts of self-harm, please contact a mental health professional 
-            or call a crisis hotline immediately.
-          </p>
+      <div className="plan-layout">
+        <div>
+          {suggestions.length > 0 ? (
+            <motion.ul className="plan-list card" variants={stagger(0.07, 0.2)} initial="hidden" animate="show">
+              {suggestions.map((suggestion, index) => {
+                const isDone = done.includes(suggestion);
+                return (
+                  <motion.li key={index} variants={fadeUp}>
+                    <button className={`plan-item ${isDone ? 'done' : ''}`} onClick={() => toggleDone(suggestion)} aria-pressed={isDone}>
+                      <span className="plan-check">
+                        {isDone && (
+                          <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 25 }}>
+                            <Check size={14} strokeWidth={3} />
+                          </motion.span>
+                        )}
+                      </span>
+                      <span className="plan-num">{String(index + 1).padStart(2, '0')}</span>
+                      <span className="plan-text">{suggestion}</span>
+                    </button>
+                  </motion.li>
+                );
+              })}
+            </motion.ul>
+          ) : (
+            <div className="card card-pad">
+              <h3>No suggestions available</h3>
+              <p className="muted" style={{ margin: '0.4rem 0 1.25rem' }}>We couldn't generate personalised suggestions this time.</p>
+              <button className="btn btn-primary" onClick={() => navigate('/ai-screening')}>Retake screening</button>
+            </div>
+          )}
         </div>
-      </motion.div>
-    </motion.div>
+
+        {analysisData && (
+          <motion.aside className="card card-pad plan-summary" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+            <span className="stat-label">Plan progress</span>
+            <p className="plan-progress-num">{completed}<span> of {suggestions.length} done</span></p>
+            <div className="progress-track">
+              <motion.div className="progress-fill" animate={{ width: `${suggestions.length ? (completed / suggestions.length) * 100 : 0}%` }} />
+            </div>
+            <div className="divider" style={{ margin: '1.5rem 0' }} />
+            <dl className="summary-list">
+              <div><dt>Assessment</dt><dd style={{ color: level.color }}>{level.title}</dd></div>
+              <div><dt>Focus area</dt><dd>{analysisData.domain || localStorage.getItem('assignedDomain') || 'General'}</dd></div>
+              <div><dt>PHQ-9 score</dt><dd>{analysisData.phq9_score} / 27</dd></div>
+            </dl>
+          </motion.aside>
+        )}
+      </div>
+
+      <div className="section">
+        <h2 className="section-title">Keep going</h2>
+        <Reveal className="grid grid-3">
+          {[
+            { icon: Flower2, title: 'Gentle yoga', text: 'Short guided sessions to release tension.', path: '/yoga' },
+            { icon: Stethoscope, title: 'Talk to an expert', text: 'Find a professional near you.', path: '/professionals' },
+            { icon: FileText, title: 'Download your report', text: 'Share your assessment with a doctor.', path: '/prescription-download' }
+          ].map(({ icon: Icon, title, text, path }) => (
+            <div key={title} className="card card-pad card-hover" onClick={() => navigate(path)}>
+              <div className="icon-tile"><Icon size={20} /></div>
+              <h3 style={{ margin: '1rem 0 0.3rem' }}>{title}</h3>
+              <p className="muted small">{text}</p>
+              <span className="card-link">Open <ArrowRight size={15} /></span>
+            </div>
+          ))}
+        </Reveal>
+      </div>
+
+      <p className="faint small" style={{ marginTop: '2.5rem', maxWidth: 720 }}>
+        These suggestions are AI-generated and are not a substitute for professional medical advice. If you're having
+        thoughts of self-harm, call Tele-MANAS on <b>14416</b> or emergency services on <b>112</b>.
+      </p>
+    </div>
   );
 };
 
 export default Suggestions;
-
-
-
-
-

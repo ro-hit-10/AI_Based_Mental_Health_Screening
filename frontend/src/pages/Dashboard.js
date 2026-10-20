@@ -1,237 +1,174 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
+import { motion } from 'framer-motion';
+import {
+  ClipboardList, MessageCircle, LineChart, FileText, Stethoscope, Flower2, BookOpen, ArrowRight, Check, AlertCircle
+} from 'lucide-react';
+import api from '../utils/api';
+import { CountUp, stagger, fadeUp, ease } from '../ui/motion';
+import Loader from '../ui/Loader';
+import BreathingWidget from '../ui/BreathingWidget';
+import { getLevel } from '../ui/levels';
 import './Dashboard.css';
+
+const FEATURES = [
+  { title: 'PHQ-9 check-in', description: 'The clinically validated 9-question depression screen.', icon: ClipboardList, path: '/phq-test' },
+  { title: 'AI screening', description: 'A short conversation, assessed by our AI models.', icon: MessageCircle, path: '/ai-screening' },
+  { title: 'Progress', description: 'See how your scores change over time.', icon: LineChart, path: '/progress' },
+  { title: 'Care report', description: 'Your full assessment, ready to save as a PDF.', icon: FileText, path: '/prescription-download' },
+  { title: 'Find an expert', description: 'Psychiatrists, psychologists and therapists near you.', icon: Stethoscope, path: '/professionals' },
+  { title: 'Yoga', description: 'Gentle guided movement for body and mind.', icon: Flower2, path: '/yoga' },
+  { title: 'Articles', description: 'Evidence-based reading on mood, sleep and stress.', icon: BookOpen, path: '/blogs' }
+];
+
+const greeting = () => {
+  const h = new Date().getHours();
+  if (h < 5) return 'Good night';
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [phqHistory, setPhqHistory] = useState([]);
+  const [screenings, setScreenings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeFeature, setActiveFeature] = useState(null);
+
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    if (!localStorage.getItem('token')) {
+      navigate('/login');
+      return;
+    }
+    const load = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          navigate('/login');
-          return;
-        }
-
-        const response = await axios.get('http://localhost:5000/api/users/dashboard', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-
-        setUser(response.data.user);
-        setLoading(false);
+        const [dash, phq, scr] = await Promise.all([
+          api.get('/api/users/dashboard'),
+          api.get('/api/phq/history').catch(() => ({ data: [] })),
+          api.get('/api/screening/history').catch(() => ({ data: [] }))
+        ]);
+        setUser(dash.data.user);
+        setPhqHistory(Array.isArray(phq.data) ? phq.data : []);
+        setScreenings(Array.isArray(scr.data) ? scr.data : []);
       } catch (err) {
-        setError('Failed to load dashboard data');
+        setError('We could not load your dashboard. Please check your connection and try again.');
+      } finally {
         setLoading(false);
-        if (err.response?.status === 401) {
-          navigate('/login');
-        }
       }
     };
-
-    fetchDashboardData();
+    load();
   }, [navigate]);
 
-  const features = [
-    {
-      title: "PHQ-9 Test",
-      description: "Take a comprehensive depression screening test",
-      icon: "📋",
-      path: "/phq-test",
-      color: "#FF6B6B",
-      gradient: "linear-gradient(45deg, #FF6B6B, #FF8E8E)"
-    },
-    {
-      title: "AI Screening",
-      description: "Get AI-powered mental health assessment",
-      icon: "🤖",
-      path: "/ai-screening",
-      color: "#6C5CE7",
-      gradient: "linear-gradient(45deg, #6C5CE7, #8F7FF7)"
-    },
-    {
-      title: "Download Prescriptions",
-      description: "Access all your prescriptions and recommendations",
-      icon: "📥",
-      path: "/prescription-download",
-      color: "#96CEB4",
-      gradient: "linear-gradient(45deg, #96CEB4, #88C0A3)"
-    },
-    {
-      title: "Connect with Professionals",
-      description: "Book sessions with mental health experts",
-      icon: "👨‍⚕️",
-      path: "/professionals",
-      color: "#FF9F43",
-      gradient: "linear-gradient(45deg, #FF9F43, #FFB976)"
-    },
-    {
-      title: "Yoga Videos",
-      description: "Access guided yoga sessions for mental wellness",
-      icon: "🧘‍♀️",
-      path: "/yoga",
-      color: "#A8E6CF",
-      gradient: "linear-gradient(45deg, #A8E6CF, #88D8B0)"
-    },
-    {
-      title: "Mental Health Blogs",
-      description: "Read informative articles about mental health",
-      icon: "📚",
-      path: "/blogs",
-      color: "#FFD93D",
-      gradient: "linear-gradient(45deg, #FFD93D, #FFE566)"
-    }
-  ];
-
-  const handleFeatureClick = (feature) => {
-    if (feature.disabled) {
-      return; // Don't navigate if feature is disabled
-    }
-    setActiveFeature(feature);
-    setTimeout(() => {
-      navigate(feature.path);
-    }, 500);
-  };
-
-  if (loading) {
-    return (
-      <div className="dashboard-container">
-        <div className="loading-spinner">Loading...</div>
-      </div>
-    );
-  }
+  if (loading) return <Loader message="Preparing your dashboard…" />;
 
   if (error) {
     return (
-      <div className="dashboard-container">
-        <div className="error-message">{error}</div>
+      <div className="page page-narrow">
+        <div className="alert alert-error"><AlertCircle size={18} /> {error}</div>
+        <button className="btn btn-primary" style={{ marginTop: '1.25rem' }} onClick={() => window.location.reload()}>Try again</button>
       </div>
     );
   }
 
+  const latestPhq = phqHistory[0];
+  const latestScreening = screenings[0];
+  const level = latestScreening ? getLevel(latestScreening.depression_level) : null;
+  const hasPHQ = Boolean(localStorage.getItem('hasCompletedPHQ')) || phqHistory.length > 0;
+  const hasScreening = Boolean(localStorage.getItem('screeningAnalysis')) || screenings.length > 0;
+
+  const journey = [
+    { label: 'PHQ-9 check-in', done: hasPHQ, path: '/phq-test' },
+    { label: 'AI screening', done: hasScreening, path: hasPHQ ? '/ai-screening' : '/phq-test' },
+    { label: 'Review your results', done: hasScreening, path: '/screening-result' },
+    { label: 'Follow your care plan', done: hasScreening, path: '/suggestions' }
+  ];
+  const nextStep = journey.find((j) => !j.done);
+  const doneCount = journey.filter((j) => j.done).length;
+
   return (
-    <motion.div 
-      className="dashboard-container"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
-      <motion.div 
-        className="dashboard-header"
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        <h1>Welcome Back{user ? `, ${user.username}` : ''}!</h1>
-        <p>Track your mental wellness and see suggestions tailored for you.</p>
-      </motion.div>
+    <div className="page">
+      <motion.section className="dash-hero" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease }}>
+        <div>
+          <span className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+          <h1 className="dash-title">{greeting()}, <em className="serif-em">{user?.username || 'friend'}</em></h1>
+          <p className="muted">How are you feeling today? Every check-in helps you understand yourself a little better.</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => navigate(nextStep ? nextStep.path : '/phq-test')}>
+          {nextStep ? `Continue: ${nextStep.label}` : 'Start a new check-in'} <ArrowRight size={17} className="arrow" />
+        </button>
+      </motion.section>
 
-      <motion.div 
-        className="dashboard-stats"
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-      >
-        <motion.div
-          className="stat-card"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="feature-icon">📊</div>
-          <h3>Your Progress</h3>
-          <p className="stat-value">Track your mental wellness journey</p>
+      <motion.section className="card stat-panel" variants={stagger(0.08, 0.15)} initial="hidden" animate="show">
+        <motion.div variants={fadeUp} className="stat-cell">
+          <span className="stat-label">Check-ins taken</span>
+          <span className="stat-num"><CountUp to={phqHistory.length} /></span>
         </motion.div>
-        <motion.div
-          className="stat-card"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="feature-icon">🎯</div>
-          <h3>Goals</h3>
-          <p className="stat-value">Set and achieve your wellness goals</p>
+        <motion.div variants={fadeUp} className="stat-cell">
+          <span className="stat-label">AI screenings</span>
+          <span className="stat-num"><CountUp to={screenings.length} /></span>
         </motion.div>
-        <motion.div
-          className="stat-card"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="feature-icon">📈</div>
-          <h3>Insights</h3>
-          <p className="stat-value">View your improvement over time</p>
+        <motion.div variants={fadeUp} className="stat-cell">
+          <span className="stat-label">Latest PHQ-9</span>
+          <span className="stat-num">{latestPhq ? <><CountUp to={latestPhq.score} /><small> / 27</small></> : '—'}</span>
+          <span className="faint small">{latestPhq ? latestPhq.severity : 'No check-in yet'}</span>
         </motion.div>
-      </motion.div>
+        <motion.div variants={fadeUp} className="stat-cell">
+          <span className="stat-label">Latest assessment</span>
+          {level ? (
+            <span className="level-pill" style={{ color: level.color, background: level.bg }}>{level.title}</span>
+          ) : <span className="stat-num">—</span>}
+          <span className="faint small">{latestScreening ? new Date(latestScreening.createdAt).toLocaleDateString() : 'Complete an AI screening'}</span>
+        </motion.div>
+      </motion.section>
 
-      <motion.div 
-        className="features-grid"
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-      >
-        {features.map((feature, index) => (
-          <motion.div
-            key={index}
-            className={`feature-card ${feature.disabled ? 'disabled' : ''}`}
-            whileHover={{ scale: feature.disabled ? 1 : 1.05 }}
-            whileTap={{ scale: feature.disabled ? 1 : 0.95 }}
-            onClick={() => handleFeatureClick(feature)}
-            style={{ opacity: feature.disabled ? 0.6 : 1 }}
-          >
-            <div className="feature-icon">{feature.icon}</div>
-            <h3>{feature.title}</h3>
-            <p>{feature.description}</p>
-            {feature.disabled && (
-              <p className="disabled-message">Complete AI screening first</p>
-            )}
-            <motion.button
-              className="feature-button"
-              whileHover={{ scale: feature.disabled ? 1 : 1.05 }}
-              whileTap={{ scale: feature.disabled ? 1 : 0.95 }}
-              disabled={feature.disabled}
-            >
-              {feature.disabled ? 'Locked' : 'Explore'}
-            </motion.button>
-          </motion.div>
-        ))}
-      </motion.div>
+      <section className="dash-split section">
+        <motion.div className="card card-pad" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.6, ease }}>
+          <div className="journey-head">
+            <h3>Your journey</h3>
+            <span className="faint small">{doneCount} of {journey.length} complete</span>
+          </div>
+          <div className="progress-track" style={{ margin: '1rem 0 1.25rem' }}>
+            <motion.div className="progress-fill" initial={{ width: 0 }} animate={{ width: `${(doneCount / journey.length) * 100}%` }} transition={{ duration: 1, delay: 0.5, ease }} />
+          </div>
+          <ol className="journey-list">
+            {journey.map((j, i) => {
+              const clickable = j.done || nextStep === j;
+              return (
+                <li
+                  key={j.label}
+                  className={`${j.done ? 'done' : ''} ${nextStep === j ? 'next' : ''} ${clickable ? 'clickable' : ''}`}
+                  onClick={() => clickable && navigate(j.path)}
+                >
+                  <span className="journey-dot">{j.done ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
+                  <span>{j.label}</span>
+                  {nextStep === j && <span className="journey-next">Up next <ArrowRight size={14} /></span>}
+                </li>
+              );
+            })}
+          </ol>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.6, ease }}>
+          <BreathingWidget />
+        </motion.div>
+      </section>
 
-      <AnimatePresence>
-        {activeFeature && (
-          <motion.div
-            className="feature-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setActiveFeature(null)}
-          >
-            <motion.div
-              className="feature-modal"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-            >
-              <h2>{activeFeature.title}</h2>
-              <p>{activeFeature.description}</p>
-              <motion.button
-                className="feature-button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => navigate(activeFeature.path)}
-              >
-                Continue
-              </motion.button>
+      <section className="section">
+        <h2 className="section-title">Explore</h2>
+        <motion.div className="grid grid-3" variants={stagger(0.05)} initial="hidden" whileInView="show" viewport={{ once: true }}>
+          {FEATURES.map(({ title, description, icon: Icon, path }) => (
+            <motion.div key={title} variants={fadeUp} className="card card-pad card-hover" onClick={() => navigate(path)}>
+              <div className="icon-tile"><Icon size={21} strokeWidth={1.8} /></div>
+              <h3 style={{ margin: '1.1rem 0 0.35rem' }}>{title}</h3>
+              <p className="muted small">{description}</p>
+              <span className="card-link">Open <ArrowRight size={15} /></span>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          ))}
+        </motion.div>
+      </section>
+    </div>
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

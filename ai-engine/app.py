@@ -2,6 +2,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+import sys
 import json
 import re
 import torch
@@ -17,13 +18,33 @@ from datetime import datetime
 
 load_dotenv()
 
+# Avoid UnicodeEncodeError on Windows consoles when printing status symbols
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 app = Flask(__name__)
 CORS(app)
 
-# Configure Gemini API (only for depression level prediction)
-genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-# Use a current, supported Gemini model
-gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+# Configure Gemini API (fallback for depression level prediction and suggestions)
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '').strip()
+gemini_model = None
+if GEMINI_API_KEY and 'your' not in GEMINI_API_KEY.lower():
+    genai.configure(api_key=GEMINI_API_KEY)
+    # gemini-1.5-flash has been retired by Google; override with GEMINI_MODEL in .env if needed
+    gemini_model = genai.GenerativeModel(os.getenv('GEMINI_MODEL', 'gemini-3.1-flash-lite'))
+else:
+    print("GEMINI_API_KEY not set in ai-engine/.env - Gemini fallback disabled")
+
+DEPRESSION_LEVELS = ["No Depression", "Mild", "Moderate", "Severe"]
+
+# Curated opener per domain so every screening asks about the user's actual problem area
+DOMAIN_QUESTIONS = {
+    "academic": "How have your studies, exams or grades been affecting how you feel lately?",
+    "work": "How has your work or workplace been affecting your mood and energy recently?",
+    "relationship": "How has your relationship with your partner been affecting how you feel lately?",
+    "family": "How have things at home with your family been affecting your mood recently?",
+    "social": "How do you feel when you spend time with other people or in social situations?",
+    "trauma": "Are there past experiences that still come back to you and affect how you feel today?"
+}
 
 # Load trained models
 class MentalHealthAI:
@@ -42,7 +63,11 @@ class MentalHealthAI:
         # Suggestion generation model (T5)
         self.suggestion_tokenizer = None
         self.suggestion_model = None
-        
+
+        # Depression level prediction model (T5) - optional, Gemini is used when absent
+        self.depression_tokenizer = None
+        self.depression_model = None
+
         # Domain labels (fallback mapping only; primary mapping uses label encoder)
         self.domain_labels = [
             'relationship',
@@ -55,8 +80,20 @@ class MentalHealthAI:
         
         self.load_models()
     
+    def download_models_if_missing(self):
+        """In the cloud the models live in a Hugging Face model repo (HF_MODEL_REPO)"""
+        repo = os.getenv('HF_MODEL_REPO')
+        marker = os.path.join(self.models_path, "domain_assignment", "config.json")
+        if not repo or os.path.exists(marker):
+            return
+        from huggingface_hub import snapshot_download
+        print(f"Downloading models from {repo}...")
+        snapshot_download(repo_id=repo, local_dir=self.models_path, token=os.getenv('HF_TOKEN'))
+        print("✓ Models downloaded")
+
     def load_models(self):
         try:
+            self.download_models_if_missing()
             print("Loading domain assignment model...")
             # Load domain assignment model
             domain_path = os.path.join(self.models_path, "domain_assignment")
@@ -87,7 +124,20 @@ class MentalHealthAI:
             except Exception as e:
                 print(f"⚠ Could not load suggestion model: {e}")
                 print("Will use Gemini API as primary for suggestions")
-            
+
+            # Try to load depression prediction model (T5)
+            print("Attempting to load depression prediction model...")
+            try:
+                depression_path = os.path.join(self.models_path, "depression_prediction")
+                if os.path.exists(os.path.join(depression_path, "config.json")):
+                    self.depression_tokenizer = T5Tokenizer.from_pretrained(depression_path)
+                    self.depression_model = T5ForConditionalGeneration.from_pretrained(depression_path)
+                    print("✓ Depression prediction model loaded successfully!")
+                else:
+                    print("⚠ Depression prediction model not found, will use Gemini API")
+            except Exception as e:
+                print(f"⚠ Could not load depression prediction model: {e}")
+
             print("Models loaded successfully!")
             
         except Exception as e:
@@ -135,17 +185,17 @@ class MentalHealthAI:
             print(f"Error in domain assignment: {e}")
             return 'General Depression', 0.5
     
-    def generate_questions(self, phq9_answers, domain, history, previous_answers=None, is_followup=False):
+    @staticmethod
+    def format_profile(phq9_answers, history, domain, occupation, age):
+        """Input format the T5 models were trained on (see quegen.ipynb)"""
+        phq_text = " ".join(f"phq{i+1}:{v}" for i, v in enumerate(phq9_answers))
+        return f"{phq_text} history: {history or 'None'} domain: {domain} occupation: {occupation or 'Unknown'} age: {age or 25}"
+
+    def generate_questions(self, phq9_answers, domain, history, previous_answers=None, is_followup=False,
+                           occupation='', age=25):
         """Use trained T5 model to generate personalized questions"""
         try:
-            # Create context for question generation
-            if is_followup:
-                context = f"Follow-up session. PHQ-9: {phq9_answers}. Domain: {domain}. History: {history}. Previous answers: {previous_answers}"
-            else:
-                context = f"Initial screening. PHQ-9: {phq9_answers}. Domain: {domain}. History: {history}"
-            
-            # Add generation prompt
-            input_text = f"Generate therapeutic questions based on: {context}"
+            input_text = self.format_profile(phq9_answers, history, domain, occupation, age)
             
             # Tokenize input
             inputs = self.question_tokenizer(
@@ -176,9 +226,12 @@ class MentalHealthAI:
             ]
 
             split_questions = []
+            domain_question = DOMAIN_QUESTIONS.get(str(domain).strip().lower())
+            if domain_question:
+                split_questions.append(domain_question)
             for text in raw_outputs:
-                # Split on question marks and line breaks
-                parts = re.split(r"[\n\r]+|(?<=\?)\s+", text)
+                # Split on "||" separators, question marks and line breaks
+                parts = re.split(r"\s*\|\|\s*|[\n\r]+|(?<=\?)\s+", text)
                 for p in parts:
                     q = p.strip()
                     if not q:
@@ -186,8 +239,9 @@ class MentalHealthAI:
                     # Ensure ends with '?'
                     if not q.endswith('?') and len(q.split()) > 3:
                         q = q.rstrip('.') + '?'
-                    # Remove numbering/prefixes
-                    q = re.sub(r"^\s*\d+\s*[).:-]\s*", "", q)
+                    # Remove numbering/prefixes (the model sometimes emits "Q-9:" style prefixes)
+                    q = re.sub(r"^\s*(Q-?\d+\s*:|\d+\s*[).:-])\s*", "", q)
+                    q = re.sub(r"\?+$", "?", q)
                     # Filter overly long or duplicate
                     if 8 <= len(q) <= 180 and q not in split_questions:
                         split_questions.append(q)
@@ -199,25 +253,108 @@ class MentalHealthAI:
             return []
     
     
-    def predict_depression_level(self, phq9_answers, domain, history, follow_up_answers):
-        """Use Gemini API to predict depression level (4-level scale)"""
+    @staticmethod
+    def normalize_depression_level(text):
+        """Map free-text model output onto the 4-level scale, or None if it is not a valid level"""
+        t = str(text).strip().lower()
+        if not t or t in ("nan", "none", "null"):
+            return None
+        if "no depression" in t or "minimal" in t or t in ("no", "normal"):
+            return "No Depression"
+        if "severe" in t:  # includes "moderately severe"
+            return "Severe"
+        if "moderate" in t:
+            return "Moderate"
+        if "mild" in t:
+            return "Mild"
+        return None
+
+    def phq9_level(self, phq9_answers):
+        """Standard PHQ-9 cut-offs mapped to the 4-level scale"""
+        phq9_score = self.calculate_phq9_score(phq9_answers)
+        if phq9_score <= 4:
+            return "No Depression"
+        if phq9_score <= 9:
+            return "Mild"
+        if phq9_score <= 14:
+            return "Moderate"
+        return "Severe"
+
+    def predict_depression_with_model(self, phq9_answers, domain, history, follow_up_answers, follow_up_questions=None):
+        """Predict depression level using the trained T5 model (primary method)"""
+        if self.depression_model is None or self.depression_tokenizer is None:
+            return None
         try:
+            qa_text = self.format_qa(follow_up_questions, follow_up_answers).replace("\n", " ")
+            input_text = f"{self.format_profile(phq9_answers, history, domain, '', '')} answers: {qa_text}"
+            inputs = self.depression_tokenizer(input_text, return_tensors="pt", max_length=512, truncation=True)
+            with torch.no_grad():
+                outputs = self.depression_model.generate(**inputs, max_length=16, num_beams=4,
+                                                         output_scores=True, return_dict_in_generate=True)
+            raw = self.depression_tokenizer.decode(outputs.sequences[0], skip_special_tokens=True)
+            level = self.normalize_depression_level(raw)
+            if level is None:
+                print(f"⚠ Depression model returned an invalid level ({raw!r}), falling back")
+                return None
+            confidence = float(torch.exp(outputs.sequences_scores[0]).item())
             phq9_score = self.calculate_phq9_score(phq9_answers)
-            
+            return {
+                "depression_level": level,
+                "confidence": max(0.0, min(1.0, confidence)),
+                "key_indicators": [f"PHQ-9 score of {phq9_score}", f"Primary domain: {domain}",
+                                   "Predicted by trained depression model"],
+                "method": "trained_model"
+            }
+        except Exception as e:
+            print(f"Error in trained model depression prediction: {e}")
+            return None
+
+    @staticmethod
+    def format_qa(follow_up_questions, follow_up_answers):
+        """Pair each generated screening question with the user's answer"""
+        answers = follow_up_answers if isinstance(follow_up_answers, list) else [follow_up_answers]
+        questions = follow_up_questions if isinstance(follow_up_questions, list) else []
+        lines = []
+        for i, answer in enumerate(answers):
+            question = questions[i] if i < len(questions) else f"Question {i + 1}"
+            lines.append(f"Q{i + 1}: {question}\nA{i + 1}: {answer}")
+        return "\n".join(lines)
+
+    def predict_depression_with_gemini(self, phq9_answers, domain, history, follow_up_answers, follow_up_questions=None):
+        """Predict depression level using Gemini API (fallback method)"""
+        if gemini_model is None:
+            return None
+        try:
+            qa_text = self.format_qa(follow_up_questions, follow_up_answers)
+
+            # The PHQ-9 score is deliberately left out: the level must come from the answers
+            # to the generated questions, and Gemini anchors on the score when it is given.
             prompt = f"""
-            You are a licensed mental health professional. Analyze the following patient information and provide a depression level assessment.
-            
-            Patient Information:
-            - PHQ-9 Score: {phq9_score} (Total score from 0-27 scale)
-            - PHQ-9 Individual Responses: {phq9_answers}
+            You are a licensed mental health professional. Assess the user's depression level
+            ONLY from their own answers to the personalized screening questions below.
+
+            Screening Questions and the User's Answers:
+            {qa_text}
+
+            Background (context only, not evidence of severity):
             - Identified Domain: {domain}
             - Mental Health History: {history if history else 'None reported'}
-            - Follow-up Session Responses: {follow_up_answers}
-            
-            Based on this comprehensive information, provide ONLY a JSON response with:
+
+            Judge what the answers reveal about mood, hopelessness, energy, sleep, appetite,
+            concentration, withdrawal, self-worth and thoughts of death or self-harm:
+            - "No Depression": answers show normal mood and coping; stress is situational and manageable.
+            - "Mild": some low mood, stress or tiredness, but the person is still functioning and engaged.
+            - "Moderate": persistent low mood plus several symptoms (sleep, energy, withdrawal,
+              worthlessness) that clearly affect daily life.
+            - "Severe": pervasive hopelessness, inability to function, or ANY mention of death,
+              self-harm or others being better off without them.
+            Short or vague answers (e.g. "yes", "maybe") carry little evidence: pick the level they
+            best support and use a lower confidence.
+
+            Provide ONLY a JSON response with:
             1. Depression Level: Choose EXACTLY one from ["No Depression", "Mild", "Moderate", "Severe"]
             2. Confidence Score: A number from 0.0 to 1.0
-            3. Key Indicators: 2-3 specific observations that led to this assessment
+            3. Key Indicators: 2-3 specific observations, quoting or referring to the user's answers
             
             Return ONLY this JSON, no other text:
             {{
@@ -231,75 +368,53 @@ class MentalHealthAI:
             result_text = response.text.strip()
             print(f"Raw Gemini response for depression level: {result_text}")
             
-            # Clean the response text
             # Remove markdown code blocks if present
-            if result_text.startswith('```json'):
-                result_text = result_text[7:]
-            if result_text.startswith('```'):
-                result_text = result_text[3:]
-            if result_text.endswith('```'):
-                result_text = result_text[:-3]
+            result_text = re.sub(r"^```(json)?|```$", "", result_text).strip()
             
-            result_text = result_text.strip()
+            result = json.loads(result_text)
+            level = self.normalize_depression_level(result.get('depression_level', ''))
+            if level is None or 'confidence' not in result:
+                print(f"⚠ Gemini returned an invalid assessment: {result_text}")
+                return None
             
-            # Parse JSON response
-            try:
-                result = json.loads(result_text)
-                
-                # Validate the response structure
-                if not all(key in result for key in ['depression_level', 'confidence', 'key_indicators']):
-                    raise ValueError("Missing required keys in response")
-                    
-                # Ensure confidence is a float between 0 and 1
-                result['confidence'] = max(0.0, min(1.0, float(result['confidence'])))
-                
-                # Ensure key_indicators is a list
-                if not isinstance(result['key_indicators'], list):
-                    result['key_indicators'] = [str(result['key_indicators'])]
-                    
-                return result
-                
-            except (json.JSONDecodeError, ValueError, KeyError) as e:
-                print(f"Error parsing Gemini response: {e}")
-                print(f"Raw response: {result_text}")
-                
-                # Fallback: Try to extract information manually
-                depression_level = "Moderate"  # Default based on PHQ-9 score
-                if phq9_score <= 4:
-                    depression_level = "No Depression"
-                elif phq9_score <= 9:
-                    depression_level = "Mild"
-                elif phq9_score <= 14:
-                    depression_level = "Moderate"
-                else:
-                    depression_level = "Severe"
-                    
-                return {
-                    "depression_level": depression_level,
-                    "confidence": 0.7,
-                    "key_indicators": [f"PHQ-9 score of {phq9_score} indicates {depression_level.lower()} depression", f"Primary domain: {domain}", "AI analysis completed with fallback scoring"]
-                }
+            key_indicators = result.get('key_indicators', [])
+            if not isinstance(key_indicators, list):
+                key_indicators = [str(key_indicators)]
+            
+            return {
+                "depression_level": level,
+                "confidence": max(0.0, min(1.0, float(result['confidence']))),
+                "key_indicators": key_indicators,
+                "method": "gemini_api"
+            }
             
         except Exception as e:
-            print(f"Error in depression level prediction: {e}")
-            phq9_score = self.calculate_phq9_score(phq9_answers)
-            
-            # Fallback scoring based on PHQ-9
-            depression_level = "Moderate"
-            if phq9_score <= 4:
-                depression_level = "No Depression"
-            elif phq9_score <= 9:
-                depression_level = "Mild"
-            elif phq9_score <= 14:
-                depression_level = "Moderate"
-            else:
-                depression_level = "Severe"
-                
-            return {
-                "depression_level": depression_level,
-                "confidence": 0.6,
-                "key_indicators": [f"PHQ-9 score: {phq9_score}", f"Domain: {domain}", "Fallback assessment due to API error"]
-            }
+            print(f"Error in Gemini depression prediction: {e}")
+            return None
+
+    def predict_depression_level(self, phq9_answers, domain, history, follow_up_answers, follow_up_questions=None):
+        """Predict depression level from the answers to the generated questions -
+        trained model first, Gemini as fallback, PHQ-9 cut-offs as last resort"""
+        result = self.predict_depression_with_model(phq9_answers, domain, history, follow_up_answers, follow_up_questions)
+        if result:
+            print(f"✓ Depression level from trained model: {result['depression_level']}")
+            return result
+        
+        result = self.predict_depression_with_gemini(phq9_answers, domain, history, follow_up_answers, follow_up_questions)
+        if result:
+            print(f"✓ Depression level from Gemini API: {result['depression_level']}")
+            return result
+        
+        phq9_score = self.calculate_phq9_score(phq9_answers)
+        depression_level = self.phq9_level(phq9_answers)
+        print(f"✓ Depression level from PHQ-9 cut-offs: {depression_level}")
+        return {
+            "depression_level": depression_level,
+            "confidence": 0.7,
+            "key_indicators": [f"PHQ-9 score of {phq9_score} falls in the {depression_level.lower()} range",
+                               f"Primary domain: {domain}"],
+            "method": "phq9_score"
+        }
     
     
     def generate_suggestions_with_model(self, depression_level, domain, history, phq9_answers):
@@ -341,23 +456,22 @@ class MentalHealthAI:
                 for output in outputs
             ]
             
-            # Process and clean suggestions
+            # Process and clean suggestions. The model emits several suggestions in one
+            # sequence separated by ";", so split them out and dedupe across sequences.
             processed_suggestions = []
             for suggestion in raw_suggestions:
-                # Clean and format suggestion
-                clean_suggestion = suggestion.strip()
-                # Remove input context if it appears in output
-                if "Generate" in clean_suggestion:
-                    parts = clean_suggestion.split(".", 1)
-                    if len(parts) > 1:
-                        clean_suggestion = parts[1].strip()
-                
-                # Remove numbering/prefixes
-                clean_suggestion = re.sub(r"^\s*\d+\s*[).:-]\s*", "", clean_suggestion)
-                clean_suggestion = re.sub(r"^\s*[-*]\s*", "", clean_suggestion)
-                
-                if len(clean_suggestion) > 15 and clean_suggestion not in processed_suggestions:
-                    processed_suggestions.append(clean_suggestion)
+                for part in suggestion.split(";"):
+                    clean_suggestion = part.strip()
+                    # Remove input context if it appears in output
+                    if clean_suggestion.startswith("Generate"):
+                        continue
+
+                    # Remove numbering/prefixes
+                    clean_suggestion = re.sub(r"^\s*\d+\s*[).:-]\s*", "", clean_suggestion)
+                    clean_suggestion = re.sub(r"^\s*[-*]\s*", "", clean_suggestion)
+
+                    if len(clean_suggestion) > 15 and clean_suggestion not in processed_suggestions:
+                        processed_suggestions.append(clean_suggestion)
             
             return processed_suggestions[:5] if processed_suggestions else None
             
@@ -367,6 +481,8 @@ class MentalHealthAI:
     
     def generate_suggestions_with_gemini(self, depression_level, domain, history, phq9_answers):
         """Generate suggestions using Gemini API (fallback method)"""
+        if gemini_model is None:
+            return None
         try:
             print("Using Gemini API for suggestion generation")
             prompt = f"""
@@ -524,13 +640,15 @@ def generate_questions():
         history = data.get('history', '')
         previous_answers = data.get('previous_answers')
         is_followup = data.get('is_followup', False)
-        
+        occupation = data.get('occupation', '')
+        age = data.get('age', 25)
+
         if not phq9_answers or not domain:
             return jsonify({"error": "PHQ-9 answers and domain are required"}), 400
-        
+
         # Generate questions using trained model
         questions = ai_model.generate_questions(
-            phq9_answers, domain, history, previous_answers, is_followup
+            phq9_answers, domain, history, previous_answers, is_followup, occupation, age
         )
         
         return jsonify({
@@ -552,13 +670,14 @@ def analyze_depression():
         domain = data.get('domain')
         history = data.get('history', '')
         follow_up_answers = data.get('follow_up_answers')
-        
+        follow_up_questions = data.get('follow_up_questions')
+
         if not all([phq9_answers, domain, follow_up_answers]):
             return jsonify({"error": "PHQ-9 answers, domain, and follow-up answers are required"}), 400
         
         # Predict depression level using Gemini
         depression_analysis = ai_model.predict_depression_level(
-            phq9_answers, domain, history, follow_up_answers
+            phq9_answers, domain, history, follow_up_answers, follow_up_questions
         )
         
         return jsonify({
@@ -606,13 +725,14 @@ def complete_screening():
         domain = data.get('domain')
         history = data.get('history', '')
         follow_up_answers = data.get('follow_up_answers')
-        
+        follow_up_questions = data.get('follow_up_questions')
+
         if not all([phq9_answers, domain, follow_up_answers]):
             return jsonify({"error": "PHQ-9 answers, domain, and follow-up answers are required"}), 400
         
         # Analyze depression level
         depression_analysis = ai_model.predict_depression_level(
-            phq9_answers, domain, history, follow_up_answers
+            phq9_answers, domain, history, follow_up_answers, follow_up_questions
         )
         
         # Generate suggestions
@@ -641,14 +761,22 @@ def health_check():
         "models_loaded": {
             "domain_assignment": ai_model.domain_model is not None,
             "question_generation": ai_model.question_model is not None,
-            "suggestion_generation": ai_model.suggestion_model is not None
+            "suggestion_generation": ai_model.suggestion_model is not None,
+            "depression_prediction": ai_model.depression_model is not None
         },
+        "gemini_configured": gemini_model is not None,
         "fallback_methods": {
-            "suggestion_method": "trained_model" if ai_model.suggestion_model is not None else "gemini_api"
+            "suggestion_method": "trained_model" if ai_model.suggestion_model is not None else "gemini_api",
+            "depression_method": "trained_model" if ai_model.depression_model is not None
+                                 else ("gemini_api" if gemini_model is not None else "phq9_score")
         },
         "timestamp": datetime.now().isoformat()
     })
 
 if __name__ == "__main__":
     print("Starting Mental Health AI Engine...")
-    app.run(debug=True, port=5001, host='0.0.0.0')
+    app.run(
+        debug=os.getenv('FLASK_DEBUG', '1') == '1',
+        port=int(os.getenv('PORT', '5001')),
+        host='0.0.0.0'
+    )

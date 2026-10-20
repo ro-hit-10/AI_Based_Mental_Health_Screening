@@ -14,7 +14,7 @@ exports.runScreening = async (req, res) => {
     }
 
     // Get user context
-    const user = await User.findById(userId).select('past_mental_health_history');
+    const user = await User.findById(userId).select('past_mental_health_history occupation age');
 
     // Generate personalized questions using trained T5 model
     const questions = await generateQuestions(
@@ -22,7 +22,9 @@ exports.runScreening = async (req, res) => {
       domain,
       user?.past_mental_health_history || '',
       previousAnswers,
-      isFollowup || false
+      isFollowup || false,
+      user?.occupation || '',
+      user?.age || 25
     );
 
     res.status(200).json({ 
@@ -94,7 +96,8 @@ exports.saveScreeningResult = async (req, res) => {
       latestPHQAnswers,
       domain,
       user?.past_mental_health_history || '',
-      answers
+      answers,
+      questions
     );
 
     // Calculate PHQ-9 score from AI response

@@ -4,20 +4,14 @@ import Screening from '../components/Screening';
 
 const AIScreening = () => {
   const navigate = useNavigate();
+  const ready = Boolean(localStorage.getItem('hasCompletedPHQ') && localStorage.getItem('latestPHQAnswers'));
 
   useEffect(() => {
-    // Check if user has completed PHQ-9
-    const hasCompletedPHQ = localStorage.getItem('hasCompletedPHQ');
-    const latestPHQAnswers = localStorage.getItem('latestPHQAnswers');
-    
-    if (!hasCompletedPHQ || !latestPHQAnswers) {
-      // Redirect to PHQ test first
-      navigate('/phq-test');
-      return;
-    }
-  }, [navigate]);
+    // The AI screening builds on the PHQ-9 answers, so send the user there first
+    if (!ready) navigate('/phq-test');
+  }, [navigate, ready]);
 
-  return <Screening />;
+  return ready ? <Screening /> : null;
 };
 
-export default AIScreening; 
+export default AIScreening;

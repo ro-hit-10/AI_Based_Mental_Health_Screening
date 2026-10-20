@@ -1,194 +1,99 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import './Login.css';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
+import { Eye, EyeOff, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
+import api from '../utils/api';
+import AuthAside from '../ui/AuthAside';
+import { stagger, fadeUp } from '../ui/motion';
+import './Auth.css';
 
 const Login = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
+  const location = useLocation();
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const shake = useAnimationControls();
+  const justRegistered = location.state?.registered;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    setError(''); // Clear error when user types
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
+    setLoading(true);
     try {
-      console.log('Attempting login with:', { email: formData.email });
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-      console.log('Login response:', { status: response.status, data });
-
-      if (response.ok) {
-        // Store token and user data
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        navigate('/dashboard');
-      } else {
-        setError(data.msg || 'Login failed. Please try again.');
-        console.error('Login failed:', data);
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      setError('Network error. Please check your connection and try again.');
-    }
-  };
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        duration: 0.5,
-        when: "beforeChildren",
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: { duration: 0.5 }
+      const { data } = await api.post('/api/auth/login', formData);
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.response?.data?.msg || 'Could not reach the server. Please check your connection and try again.');
+      shake.start({ x: [0, -10, 10, -6, 6, -3, 3, 0], transition: { duration: 0.45 } });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <motion.div 
-      className="login-container"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      <motion.div 
-        className="login-content"
-        variants={itemVariants}
-      >
-        <motion.h1 
-          className="login-title"
-          variants={itemVariants}
-        >
-          Welcome Back
-        </motion.h1>
-        
-        <motion.p 
-          className="login-subtitle"
-          variants={itemVariants}
-        >
-          Sign in to continue your journey
-        </motion.p>
+    <div className="auth-split">
+      <div className="auth-main">
+        <motion.div className="auth-box" animate={shake}>
+          <motion.div variants={stagger(0.07, 0.05)} initial="hidden" animate="show">
+            <motion.span className="eyebrow" variants={fadeUp}>Welcome back</motion.span>
+            <motion.h1 className="auth-title" variants={fadeUp}>Sign in to MindCare</motion.h1>
+            <motion.p className="muted" variants={fadeUp}>Pick up your journey where you left it.</motion.p>
 
-        {error && (
-          <motion.div 
-            className="error-message"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            {error}
+            <form onSubmit={handleSubmit} className="auth-form" noValidate={false}>
+              <AnimatePresence>
+                {justRegistered && !error && (
+                  <motion.div className="alert alert-info" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                    <CheckCircle2 size={18} /> Account created. Sign in to get started.
+                  </motion.div>
+                )}
+                {error && (
+                  <motion.div className="alert alert-error" role="alert" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                    <AlertCircle size={18} /> {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <motion.div className="field" variants={fadeUp}>
+                <label htmlFor="email">Email</label>
+                <input className="input" type="email" id="email" name="email" value={formData.email}
+                  onChange={handleChange} required placeholder="you@example.com" autoComplete="email" />
+              </motion.div>
+
+              <motion.div className="field" variants={fadeUp}>
+                <label htmlFor="password">Password</label>
+                <div className="pw-wrap">
+                  <input className="input" type={showPw ? 'text' : 'password'} id="password" name="password"
+                    value={formData.password} onChange={handleChange} required placeholder="Your password"
+                    autoComplete="current-password" style={{ paddingRight: '3rem' }} />
+                  <button type="button" className="pw-toggle" onClick={() => setShowPw((s) => !s)} aria-label={showPw ? 'Hide password' : 'Show password'}>
+                    {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </motion.div>
+
+              <motion.button type="submit" className="btn btn-primary btn-block" variants={fadeUp} disabled={loading}>
+                {loading ? 'Signing in…' : <>Sign in <ArrowRight size={17} className="arrow" /></>}
+              </motion.button>
+            </form>
+
+            <motion.p className="auth-switch" variants={fadeUp}>
+              New to MindCare? <button onClick={() => navigate('/register')}>Create an account</button>
+            </motion.p>
           </motion.div>
-        )}
-
-        <form onSubmit={handleSubmit} className="login-form">
-          <motion.div 
-            className="form-group"
-            variants={itemVariants}
-          >
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              placeholder="Enter your email"
-            />
-          </motion.div>
-
-          <motion.div 
-            className="form-group"
-            variants={itemVariants}
-          >
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              placeholder="Enter your password"
-            />
-          </motion.div>
-
-          <motion.div 
-            className="form-options"
-            variants={itemVariants}
-          >
-            <label className="remember-me">
-              <input type="checkbox" />
-              <span>Remember me</span>
-            </label>
-            <motion.button 
-              type="button" 
-              className="forgot-password"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Forgot Password?
-            </motion.button>
-          </motion.div>
-
-          <motion.button
-            type="submit"
-            className="login-button"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            variants={itemVariants}
-          >
-            Sign In
-          </motion.button>
-        </form>
-
-        <motion.div 
-          className="signup-prompt"
-          variants={itemVariants}
-        >
-          <p>
-            Don't have an account?{' '}
-            <motion.span
-              className="signup-link"
-              onClick={() => navigate('/register')}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Sign Up
-            </motion.span>
-          </p>
         </motion.div>
-      </motion.div>
-    </motion.div>
+      </div>
+      <AuthAside />
+    </div>
   );
 };
 

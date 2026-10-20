@@ -3,6 +3,8 @@
 # ==============================
 
 # Large model files
+ai-engine/models_onnx/
+*.onnx
 *.safetensors
 *.pt
 *.bin
@@ -13,7 +15,11 @@
 __pycache__/
 *.pyc
 .venv/
-.env/
+
+# Environment files with secrets (any folder)
+.env
+.env.*
+!.env.example
 
 # Node.js dependencies
 node_modules/

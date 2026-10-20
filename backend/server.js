@@ -14,13 +14,29 @@ connectDB();
 
 const app = express();
 
-// Configure CORS
+// Configure CORS - add deployed frontends via CORS_ORIGINS (comma separated, "*.vercel.app" style wildcards allowed)
+const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001', ...(process.env.CORS_ORIGINS || '').split(',')]
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const isAllowedOrigin = (origin) => allowedOrigins.some((allowed) => {
+  if (allowed.startsWith('*.')) return origin.endsWith(allowed.slice(1));
+  return origin === allowed;
+});
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  origin: (origin, callback) => {
+    // Allow non-browser requests (no Origin header) and listed origins
+    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
   credentials: true
 }));
 
 app.use(express.json());
+
+// Health check for Render
+app.get("/", (req, res) => res.json({ status: "ok", service: "mindcare-backend" }));
 
 // Routes
 app.use("/api/auth", authRoutes);

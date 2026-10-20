@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import './Dashboard.css'; // Use dashboard styling
+import { Phone, ExternalLink, Star, X, Info } from 'lucide-react';
+import PageHeader from '../ui/PageHeader';
+import { FilterChips } from '../ui/motion';
 
 const Professionals = () => {
-  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedCity, setSelectedCity] = useState('mumbai');
   const [selectedProfessional, setSelectedProfessional] = useState(null);
 
   const categories = [
-    { id: 'all', name: 'All Specialists', icon: '👥' },
-    { id: 'psychiatrist', name: 'Psychiatrists', icon: '🧠' },
-    { id: 'psychologist', name: 'Psychologists', icon: '💭' },
-    { id: 'therapist', name: 'Therapists', icon: '🤝' },
-    { id: 'counselor', name: 'Counselors', icon: '💬' }
+    { id: 'all', name: 'All specialists' },
+    { id: 'psychiatrist', name: 'Psychiatrists' },
+    { id: 'psychologist', name: 'Psychologists' },
+    { id: 'therapist', name: 'Therapists' },
+    { id: 'counselor', name: 'Counsellors' }
   ];
 
   const cities = [
@@ -143,432 +143,151 @@ const Professionals = () => {
     }
   ];
 
-  const filteredProfessionals = professionals.filter(prof => {
+  const filteredProfessionals = professionals.filter((prof) => {
     const categoryMatch = selectedCategory === 'all' || prof.category === selectedCategory;
     const cityMatch = prof.city === selectedCity;
     return categoryMatch && cityMatch;
   });
 
-  const getCategoryColor = (category) => {
-    switch(category) {
-      case 'psychiatrist': return '#FF6B6B';
-      case 'psychologist': return '#6C5CE7';
-      case 'therapist': return '#4ECDC4';
-      case 'counselor': return '#FFD93D';
-      default: return '#00b4d8';
-    }
-  };
-
   const openJustDial = (url) => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
+  const initials = (name) => name.replace('Dr. ', '').split(' ').map((p) => p[0]).join('').slice(0, 2);
+
   return (
-    <motion.div
-      className="dashboard-container"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
-      <motion.div 
-        className="dashboard-header"
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        <h1>👨‍⚕️ Connect with Mental Health Professionals</h1>
-        <p>Find and connect with qualified doctors, therapists, and counselors in your area</p>
-      </motion.div>
+    <div className="page">
+      <PageHeader
+        eyebrow="Professional support"
+        title="Find the right expert"
+        italic={[3]}
+        subtitle="Psychiatrists, psychologists, therapists and counsellors in your city."
+      />
 
-      {/* Filter Controls */}
-      <motion.div 
-        className="dashboard-stats"
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-      >
-        <div className="stat-card">
-          <h3>🏥 Specialty</h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1rem' }}>
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => setSelectedCategory(category.id)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '20px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  background: selectedCategory === category.id ? '#00b4d8' : 'rgba(255, 255, 255, 0.1)',
-                  color: 'white',
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                <span>{category.icon}</span> {category.name}
-              </button>
-            ))}
-          </div>
+      <div className="card card-pad filter-panel">
+        <div>
+          <span className="stat-label">City</span>
+          <FilterChips options={cities} value={selectedCity} onChange={setSelectedCity} layoutId="city-chip" />
         </div>
-        
-        <div className="stat-card">
-          <h3>📍 City</h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1rem' }}>
-            {cities.map((city) => (
-              <button
-                key={city.id}
-                onClick={() => setSelectedCity(city.id)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '20px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  background: selectedCity === city.id ? '#00b4d8' : 'rgba(255, 255, 255, 0.1)',
-                  color: 'white',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                {city.name}
-              </button>
-            ))}
-          </div>
+        <div>
+          <span className="stat-label">Specialty</span>
+          <FilterChips options={categories} value={selectedCategory} onChange={setSelectedCategory} layoutId="spec-chip" />
         </div>
-        
-        <div className="stat-card">
-          <div className="feature-icon">📊</div>
-          <h3>Available Doctors</h3>
-          <p className="stat-value" style={{ fontSize: '2rem', fontWeight: 'bold' }}>
-            {filteredProfessionals.length}
-          </p>
-          <p style={{ fontSize: '0.9rem' }}>In {cities.find(c => c.id === selectedCity)?.name}</p>
-        </div>
-      </motion.div>
+      </div>
 
-      {/* Professionals Grid */}
-      <motion.div 
-        className="features-grid"
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-      >
-        {filteredProfessionals.map((professional, index) => (
-          <motion.div
-            key={professional.id}
-            className="feature-card"
-            whileHover={{ scale: 1.02 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 * index }}
-            onClick={() => setSelectedProfessional(professional)}
-            style={{ cursor: 'pointer' }}
-          >
-            {/* Professional Avatar */}
-            <div style={{
-              width: '80px',
-              height: '80px',
-              background: getCategoryColor(professional.category),
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '2rem',
-              marginBottom: '1rem',
-              margin: '0 auto 1rem auto'
-            }}>
-              {professional.category === 'psychiatrist' ? '🧠' : 
-               professional.category === 'psychologist' ? '💭' :
-               professional.category === 'therapist' ? '🤝' : '💬'}
-            </div>
-            
-            <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem' }}>{professional.name}</h3>
-            <p style={{ color: getCategoryColor(professional.category), fontWeight: 'bold', marginBottom: '0.5rem' }}>
-              {professional.title}
-            </p>
-            
-            <p style={{ 
-              fontSize: '0.9rem',
-              color: '#e0e0e0',
-              marginBottom: '1rem',
-              textAlign: 'center'
-            }}>
-              {professional.specialization}
-            </p>
-            
-            {/* Quick Info */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: '1fr 1fr', 
-              gap: '0.5rem', 
-              marginBottom: '1rem',
-              fontSize: '0.8rem'
-            }}>
-              <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.1)', padding: '0.5rem', borderRadius: '8px' }}>
-                <div style={{ fontWeight: 'bold', color: '#FFD93D' }}>⭐ {professional.rating}</div>
-                <div style={{ opacity: 0.8 }}>Rating</div>
+      <div className="alert alert-info" style={{ margin: '1.25rem 0 1.75rem' }}>
+        <Info size={18} /> Sample listings for demonstration. Please verify details on JustDial before booking.
+      </div>
+
+      <motion.div className="grid grid-3" layout>
+        <AnimatePresence mode="popLayout">
+          {filteredProfessionals.map((professional, i) => (
+            <motion.article
+              key={professional.id}
+              layout
+              className="card card-pad card-hover"
+              onClick={() => setSelectedProfessional(professional)}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0, transition: { delay: i * 0.05 } }}
+              exit={{ opacity: 0 }}
+            >
+              <div className="pro-head">
+                <div className="avatar">{initials(professional.name)}</div>
+                <div>
+                  <h3>{professional.name}</h3>
+                  <span className="muted small">{professional.title}</span>
+                </div>
               </div>
-              <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.1)', padding: '0.5rem', borderRadius: '8px' }}>
-                <div style={{ fontWeight: 'bold', color: '#4ECDC4' }}>{professional.experience}</div>
-                <div style={{ opacity: 0.8 }}>Experience</div>
+              <p className="muted small" style={{ marginTop: '1rem' }}>{professional.specialization}</p>
+              <dl className="pro-facts">
+                <div><dt>Rating</dt><dd><Star size={13} fill="currentColor" /> {professional.rating}</dd></div>
+                <div><dt>Experience</dt><dd>{professional.experience}</dd></div>
+                <div><dt>Fees</dt><dd>{professional.fees}</dd></div>
+              </dl>
+              <div className="btn-row" style={{ marginTop: '1.25rem' }}>
+                <a className="btn btn-primary btn-sm" style={{ flex: 1 }} href={`tel:${professional.phone}`} onClick={(e) => e.stopPropagation()}>
+                  <Phone size={15} /> Call
+                </a>
+                <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={(e) => { e.stopPropagation(); openJustDial(professional.justdialUrl); }}>
+                  JustDial <ExternalLink size={14} />
+                </button>
               </div>
-            </div>
-            
-            {/* Fees */}
-            <div style={{ 
-              background: 'rgba(0, 180, 216, 0.2)',
-              padding: '0.5rem',
-              borderRadius: '8px',
-              textAlign: 'center',
-              marginBottom: '1rem'
-            }}>
-              <strong style={{ color: '#00b4d8' }}>{professional.fees}</strong>
-            </div>
-            
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openJustDial(professional.justdialUrl);
-                }}
-                style={{
-                  flex: 1,
-                  padding: '0.7rem',
-                  borderRadius: '25px',
-                  border: 'none',
-                  background: 'linear-gradient(45deg, #FF6B6B, #FF8E8E)',
-                  color: 'white',
-                  fontSize: '0.9rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                📞 JustDial
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(`tel:${professional.phone}`, '_self');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '0.7rem',
-                  borderRadius: '25px',
-                  border: 'none',
-                  background: 'linear-gradient(45deg, #4ECDC4, #45B7AF)',
-                  color: 'white',
-                  fontSize: '0.9rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                📱 Call
-              </button>
-            </div>
-          </motion.div>
-        ))}
+            </motion.article>
+          ))}
+        </AnimatePresence>
       </motion.div>
 
       {filteredProfessionals.length === 0 && (
-        <motion.div 
-          className="features-grid"
-          style={{ gridTemplateColumns: '1fr' }}
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <motion.div className="feature-card">
-            <div className="feature-icon" style={{ fontSize: '3rem' }}>🔍</div>
-            <h3>No Professionals Found</h3>
-            <p>No mental health professionals found for the selected filters. Try changing the city or specialty.</p>
-          </motion.div>
-        </motion.div>
+        <div className="card card-pad">
+          <h3>No professionals found</h3>
+          <p className="muted small">Try another city or specialty.</p>
+        </div>
       )}
 
-      {/* Back to Dashboard Button */}
-      <motion.div 
-        className="dashboard-stats"
-        style={{ marginTop: '3rem' }}
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.8 }}
-      >
-        <motion.button
-          className="feature-button"
-          style={{ width: '100%', padding: '1.2rem 2rem' }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => navigate('/dashboard')}
-        >
-          ← Back to Dashboard
-        </motion.button>
-      </motion.div>
-
-      {/* Professional Detail Modal */}
       <AnimatePresence>
         {selectedProfessional && (
-          <motion.div
-            className="feature-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSelectedProfessional(null)}
-          >
+          <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedProfessional(null)}>
             <motion.div
-              className="feature-modal"
-              style={{ maxWidth: '90%', width: '900px', maxHeight: '90vh', overflow: 'auto' }}
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
+              className="modal"
+              role="dialog"
+              aria-label={selectedProfessional.name}
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div style={{
-                  width: '80px',
-                  height: '80px',
-                  background: getCategoryColor(selectedProfessional.category),
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '2.5rem'
-                }}>
-                  {selectedProfessional.category === 'psychiatrist' ? '🧠' : 
-                   selectedProfessional.category === 'psychologist' ? '💭' :
-                   selectedProfessional.category === 'therapist' ? '🤝' : '💬'}
-                </div>
-                <div>
-                  <h2 style={{ marginBottom: '0.5rem' }}>{selectedProfessional.name}</h2>
-                  <p style={{ color: getCategoryColor(selectedProfessional.category), fontSize: '1.1rem' }}>
-                    {selectedProfessional.title}
-                  </p>
-                </div>
-              </div>
-              
-              {/* Professional Details Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-                
-                {/* Basic Info */}
-                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '10px' }}>
-                  <h4 style={{ color: '#00b4d8', marginBottom: '0.75rem' }}>📋 Basic Information</h4>
-                  <div style={{ fontSize: '0.9rem', lineHeight: '1.8' }}>
-                    <p><strong>Specialization:</strong> {selectedProfessional.specialization}</p>
-                    <p><strong>Experience:</strong> {selectedProfessional.experience}</p>
-                    <p><strong>Rating:</strong> ⭐ {selectedProfessional.rating}/5</p>
-                    <p><strong>Fees:</strong> {selectedProfessional.fees}</p>
+              <div className="modal-head">
+                <div className="pro-head">
+                  <div className="avatar lg">{initials(selectedProfessional.name)}</div>
+                  <div>
+                    <h2 style={{ fontSize: '2rem' }}>{selectedProfessional.name}</h2>
+                    <p className="muted">{selectedProfessional.title}</p>
                   </div>
                 </div>
-                
-                {/* Contact Info */}
-                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '10px' }}>
-                  <h4 style={{ color: '#00b4d8', marginBottom: '0.75rem' }}>📞 Contact Information</h4>
-                  <div style={{ fontSize: '0.9rem', lineHeight: '1.8' }}>
-                    <p><strong>Clinic:</strong> {selectedProfessional.clinic}</p>
-                    <p><strong>Address:</strong> {selectedProfessional.address}</p>
-                    <p><strong>Phone:</strong> {selectedProfessional.phone}</p>
-                    <p><strong>Hours:</strong> {selectedProfessional.availability}</p>
+                <button className="btn btn-ghost btn-sm" onClick={() => setSelectedProfessional(null)} aria-label="Close"><X size={18} /></button>
+              </div>
+
+              <div className="info-grid">
+                <div className="info-box">
+                  <h4>Practice</h4>
+                  <p><b>Specialization:</b> {selectedProfessional.specialization}</p>
+                  <p><b>Experience:</b> {selectedProfessional.experience}</p>
+                  <p><b>Rating:</b> {selectedProfessional.rating} / 5</p>
+                  <p><b>Fees:</b> {selectedProfessional.fees}</p>
+                </div>
+                <div className="info-box">
+                  <h4>Contact</h4>
+                  <p><b>Clinic:</b> {selectedProfessional.clinic}</p>
+                  <p><b>Address:</b> {selectedProfessional.address}</p>
+                  <p><b>Phone:</b> {selectedProfessional.phone}</p>
+                  <p><b>Hours:</b> {selectedProfessional.availability}</p>
+                </div>
+              </div>
+
+              {[
+                ['Qualifications', selectedProfessional.qualifications],
+                ['Languages', selectedProfessional.languages],
+                ['Treatments', selectedProfessional.treatments]
+              ].map(([label, items]) => (
+                <div key={label} style={{ marginBottom: '1.1rem' }}>
+                  <p className="stat-label" style={{ marginBottom: '0.5rem' }}>{label}</p>
+                  <div className="chip-row">
+                    {items.map((item) => <span key={item} className="badge">{item}</span>)}
                   </div>
                 </div>
-              </div>
-              
-              {/* Qualifications */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <h4 style={{ color: '#00b4d8', marginBottom: '0.75rem' }}>🎓 Qualifications</h4>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {selectedProfessional.qualifications.map((qual, i) => (
-                    <span key={i} style={{
-                      background: 'rgba(0, 180, 216, 0.2)',
-                      color: '#00b4d8',
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '15px',
-                      fontSize: '0.9rem',
-                      fontWeight: 'bold'
-                    }}>
-                      {qual}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Languages */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <h4 style={{ color: '#00b4d8', marginBottom: '0.75rem' }}>🌐 Languages Spoken</h4>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {selectedProfessional.languages.map((lang, i) => (
-                    <span key={i} style={{
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '15px',
-                      fontSize: '0.9rem'
-                    }}>
-                      {lang}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Treatments */}
-              <div style={{ marginBottom: '2rem' }}>
-                <h4 style={{ color: '#00b4d8', marginBottom: '0.75rem' }}>💊 Treatment Specialties</h4>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {selectedProfessional.treatments.map((treatment, i) => (
-                    <span key={i} style={{
-                      background: getCategoryColor(selectedProfessional.category) + '20',
-                      color: getCategoryColor(selectedProfessional.category),
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '15px',
-                      fontSize: '0.9rem',
-                      fontWeight: 'bold'
-                    }}>
-                      {treatment}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                <motion.button
-                  className="feature-button"
-                  style={{ background: 'linear-gradient(45deg, #FF6B6B, #FF8E8E)' }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => openJustDial(selectedProfessional.justdialUrl)}
-                >
-                  📞 View on JustDial
-                </motion.button>
-                
-                <motion.button
-                  className="feature-button"
-                  style={{ background: 'linear-gradient(45deg, #4ECDC4, #45B7AF)' }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => window.open(`tel:${selectedProfessional.phone}`, '_self')}
-                >
-                  📱 Call Now
-                </motion.button>
-                
-                <motion.button
-                  className="feature-button"
-                  style={{ background: 'rgba(255, 255, 255, 0.1)' }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setSelectedProfessional(null)}
-                >
-                  Close
-                </motion.button>
+              ))}
+
+              <div className="btn-row" style={{ marginTop: '1.5rem' }}>
+                <a className="btn btn-primary" href={`tel:${selectedProfessional.phone}`}><Phone size={16} /> Call now</a>
+                <button className="btn btn-ghost" onClick={() => openJustDial(selectedProfessional.justdialUrl)}>View on JustDial <ExternalLink size={15} /></button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 };
 
-export default Professionals; 
+export default Professionals;

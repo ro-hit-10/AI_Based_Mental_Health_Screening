@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-label="MindCare AI - AI-assisted mental health screening">
+  <title>MindCare AI</title>
+  <style>
+    .serif { font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif; }
+    .sans { font-family: Inter, 'Segoe UI', Helvetica, Arial, sans-serif; }
+    .breathe { transform-origin: 948px 210px; animation: breathe 8s ease-in-out infinite; }
+    .ripple { transform-origin: 948px 210px; animation: ripple 8s ease-out infinite; }
+    .ring { stroke-dasharray: 440; stroke-dashoffset: 440; animation: fill 3.2s cubic-bezier(.22,1,.36,1) .4s forwards; }
+    .fade { opacity: 0; animation: fade 1s ease .2s forwards; }
+    .fade2 { opacity: 0; animation: fade 1s ease .6s forwards; }
+    .fade3 { opacity: 0; animation: fade 1s ease 1s forwards; }
+    .chip { opacity: 0; animation: chip 1s cubic-bezier(.22,1,.36,1) forwards; }
+    .c1 { animation-delay: 1.2s; } .c2 { animation-delay: 1.5s; } .c3 { animation-delay: 1.8s; }
+    @keyframes breathe { 0%,100% { transform: scale(.82); } 45%,55% { transform: scale(1); } }
+    @keyframes ripple { 0% { transform: scale(.8); opacity: .55; } 100% { transform: scale(1.45); opacity: 0; } }
+    @keyframes fill { to { stroke-dashoffset: 244; } }
+    @keyframes fade { to { opacity: 1; } }
+    @keyframes chip { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; opacity: 1 !important; } .ring { stroke-dashoffset: 244; } }
+  </style>
+
+  <defs>
+    <clipPath id="card"><rect width="1200" height="420" rx="24"/></clipPath>
+  </defs>
+
+  <!-- paper background -->
+  <rect width="1200" height="420" rx="24" fill="#f7f6f2"/>
+  <circle cx="948" cy="210" r="300" fill="#1f5e4a" opacity=".05" clip-path="url(#card)"/>
+  <rect x=".5" y=".5" width="1199" height="419" rx="23.5" fill="none" stroke="#e3e0d7"/>
+
+  <!-- left: wordmark and copy -->
+  <g class="fade">
+    <rect x="72" y="74" width="40" height="40" rx="10" fill="#1f5e4a"/>
+    <path d="M86 102c0-9 6-15 15-16-1 9-6 15-15 16zm0 0c2-4 5-7 9-9" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <text x="126" y="104" class="serif" font-size="34" fill="#0f1210">MindCare</text>
+  </g>
+  <g class="fade2">
+    <text x="72" y="168" class="sans" font-size="13" font-weight="600" letter-spacing="2.4" fill="#1f5e4a">— AI-ASSISTED MENTAL HEALTH SCREENING</text>
+    <text x="70" y="232" class="serif" font-size="58" fill="#0f1210">Understand how you're</text>
+    <text x="70" y="296" class="serif" font-size="58" font-style="italic" fill="#1f5e4a">really feeling.</text>
+  </g>
+  <g class="fade3 sans" font-size="15" fill="#4b514d">
+    <text x="72" y="342">PHQ-9  ·  Fine-tuned RoBERTa &amp; T5  ·  Gemini  ·  React  ·  Node.js  ·  Flask</text>
+  </g>
+
+  <!-- right: breathing orb with PHQ score ring -->
+  <circle class="ripple" cx="948" cy="210" r="96" fill="none" stroke="#1f5e4a" stroke-width="1.5"/>
+  <circle class="breathe" cx="948" cy="210" r="96" fill="#e3eee8" stroke="#1f5e4a" stroke-width="2"/>
+  <circle cx="948" cy="210" r="70" fill="#fff" stroke="#efede6" stroke-width="10"/>
+  <circle class="ring" cx="948" cy="210" r="70" fill="none" stroke="#1f5e4a" stroke-width="10" stroke-linecap="round" transform="rotate(-90 948 210)"/>
+  <text x="948" y="222" text-anchor="middle" class="serif" font-size="44" fill="#0f1210">12</text>
+  <text x="948" y="246" text-anchor="middle" class="sans" font-size="11" fill="#6b716c">PHQ-9 / 27</text>
+
+  <!-- floating result chips -->
+  <g class="chip c1">
+    <rect x="1010" y="84" width="150" height="40" rx="20" fill="#fff" stroke="#e3e0d7"/>
+    <circle cx="1032" cy="104" r="5" fill="#1d7350"/>
+    <text x="1046" y="109" class="sans" font-size="13" font-weight="600" fill="#0f1210">Focus: Academic</text>
+  </g>
+  <g class="chip c2">
+    <rect x="712" y="300" width="128" height="40" rx="20" fill="#fce8db"/>
+    <text x="776" y="325" text-anchor="middle" class="sans" font-size="13" font-weight="600" fill="#b0440a">Moderate</text>
+  </g>
+  <g class="chip c3">
+    <rect x="1000" y="318" width="166" height="40" rx="20" fill="#0f1210"/>
+    <text x="1083" y="343" text-anchor="middle" class="sans" font-size="13" font-weight="600" fill="#fff">Care plan ready</text>
+  </g>
+</svg>
