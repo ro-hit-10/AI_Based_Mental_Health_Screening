@@ -245,21 +245,6 @@ Open **http://localhost:3000**. The AI engine takes ~20 seconds to load its mode
 └── docs/                README images and diagrams
 ```
 
-## Deployment notes
-
-Deployment configs are included but **not active**: `render.yaml` (backend), `frontend/vercel.json`
-(frontend) and `ai-engine/Dockerfile` (AI engine). The AI engine needs roughly 1–2 GB of RAM, which is more
-than free tiers such as Render's 512 MB provide. `ai-engine/tools/export_onnx.py` produces compressed ONNX
-models (int8 T5, fp16 RoBERTa); in testing they ran in about 1 GB without PyTorch, which is still above
-512 MB.
-
-## Known limitations
-
-- The domain classifier reaches about 35% accuracy on the project dataset with the current input format;
-  its original training script (and exact input format) would be needed to restore the 80% reported in training.
-- The T5 question generator tends to produce generic questions, so each session opens with one curated
-  domain-specific question.
-- The *Find an expert* directory contains sample listings for demonstration.
 
 ---
 
